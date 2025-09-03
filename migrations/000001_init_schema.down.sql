@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_pools;
+DROP TABLE IF EXISTS owners_api_keys;
+DROP TABLE IF EXISTS owners;
