@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkalsi97/authx/api"
 	"github.com/pkalsi97/authx/internal/config"
 	"github.com/pkalsi97/authx/internal/db"
+	"github.com/pkalsi97/authx/internal/server"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 
 	db.StartDb(dbUrl)
 
-	mux := api.SetUpRoutes()
+	mux := server.SetUpRoutes()
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
