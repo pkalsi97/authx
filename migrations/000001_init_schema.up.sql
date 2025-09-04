@@ -66,9 +66,9 @@ CREATE TABLE refresh_tokens (
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_pool_id UUID NOT NULL REFERENCES user_pools(id) ON DELETE CASCADE,
-    actor_id UUID REFERENCES users(id),
+    actor_id UUID REFERENCES users(id) NOT NULL,
     action TEXT NOT NULL,
-    target_id UUID,
+    target_id UUID NOT NULL,
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP DEFAULT now()
 );
