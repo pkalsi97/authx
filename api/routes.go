@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/pkalsi97/authx/internal/admin"
 	"github.com/pkalsi97/authx/internal/auth"
 	"github.com/pkalsi97/authx/internal/rbac"
 	"github.com/pkalsi97/authx/internal/user"
@@ -10,7 +11,8 @@ import (
 
 func SetUpRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
-	registerUserPoolRoutes(mux)
+	registerAdminRoutes(mux)
+	registerRbacRoutes(mux)
 	registerAuthRoutes(mux)
 	registerOauthRoutes(mux)
 	registerUserRoutes(mux)
@@ -20,11 +22,23 @@ func SetUpRoutes() *http.ServeMux {
 /*
 -----------------------
 
-	UserPool Routes
+	Admin Routes
 
 -----------------------
 */
-func registerUserPoolRoutes(mux *http.ServeMux) {
+func registerAdminRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/v1/admin/owners/", admin.OwnerRouter)
+	mux.HandleFunc("/api/v1/admin/user-pools/", admin.UserPoolRouter)
+}
+
+/*
+-----------------------
+
+	Rbac Routes
+
+-----------------------
+*/
+func registerRbacRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/user-pools/", rbac.RbacRouter)
 }
 
