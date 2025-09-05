@@ -89,3 +89,26 @@ type AuditLog struct {
 	Metadata   map[string]interface{} `json:"metadata"`
 	CreatedAt  time.Time              `json:"created_at"`
 }
+
+type UserSignupData struct {
+	ID            string `json:"id"`
+	Phone         string `json:"phone"`
+	PhoneVerified bool   `json:"phone_verified"`
+	PhoneTries    int    `json:"phone_tries"`
+	PhoneOtp      string `json:"phone_otp"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	EmailTries    int    `json:"email_tries"`
+	EmailOtp      string `json:"email_otp"`
+	Userpool      string `json:"userpool"`
+}
+
+type UserSignupVerification struct {
+	ID     string `json:"id"`
+	Answer string `json:"answer"`
+}
+
+type SignupComplete struct {
+	ID       string `json:"id"`
+	Password string `json:"password"`
+}
