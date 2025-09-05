@@ -13,6 +13,7 @@ type Config struct {
 	JwtSecret string
 	RedisAddr string
 	RedisDb   string
+	Retries   string
 }
 
 func LoadConfig() *Config {
@@ -24,6 +25,7 @@ func LoadConfig() *Config {
 		JwtSecret: getEnv("JWT_SECRET"),
 		RedisAddr: getEnv("REDIS_ADDR"),
 		RedisDb:   getEnv("REDIS_DB"),
+		Retries:   getEnv("RETRIES"),
 	}
 	return cfg
 }
