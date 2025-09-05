@@ -11,6 +11,8 @@ type Config struct {
 	Port      string
 	DbUrl     string
 	JwtSecret string
+	RedisAddr string
+	RedisDb   string
 }
 
 func LoadConfig() *Config {
@@ -20,8 +22,9 @@ func LoadConfig() *Config {
 		Port:      getEnv("PORT"),
 		DbUrl:     getEnv("DB_URL"),
 		JwtSecret: getEnv("JWT_SECRET"),
+		RedisAddr: getEnv("REDIS_ADDR"),
+		RedisDb:   getEnv("REDIS_DB"),
 	}
-
 	return cfg
 }
 
