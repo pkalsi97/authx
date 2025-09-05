@@ -18,8 +18,11 @@ func main() {
 	cfg := config.LoadConfig()
 	port := cfg.Port
 	dbUrl := cfg.DbUrl
+	redisAddr := cfg.RedisAddr
+	redisDb := cfg.RedisDb
 
 	db.StartDb(dbUrl)
+	db.StartRedis(redisAddr, redisDb)
 
 	mux := server.SetUpRoutes()
 	server := &http.Server{
@@ -50,4 +53,5 @@ func main() {
 	}
 
 	db.CloseDB()
+	db.StopRedis()
 }
