@@ -55,8 +55,7 @@ func registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/signup/otp/phone/request", handlers.SignupPhoneOtpRequestHandler)
 	mux.HandleFunc("/api/v1/auth/signup/otp/phone/verify", handlers.SignupPhoneOtpVerifyHandler)
 	mux.HandleFunc("/api/v1/auth/signup/otp/email/request", handlers.SignupEmailOtpRequestHandler)
-	mux.HandleFunc("/api/v1/auth/signup/otp/email/verify", handlers.SignupEmailOtpVerifyHandler)
-	mux.HandleFunc("/api/v1/auth/signup/complete", handlers.SignupCompleteHandler)
+	mux.HandleFunc("/api/v1/auth/signup/complete", handlers.SignupVerifyAndCompleteHandler)
 	mux.HandleFunc("/api/v1/auth/password/request", handlers.PasswordResetRequestHandler)
 	mux.HandleFunc("/api/v1/auth/password/reset", handlers.PasswordResetCompleteHandler)
 }
