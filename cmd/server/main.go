@@ -12,6 +12,7 @@ import (
 	"github.com/pkalsi97/authx/internal/config"
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/server"
+	"github.com/pkalsi97/authx/internal/utils"
 )
 
 func main() {
@@ -20,7 +21,9 @@ func main() {
 	dbUrl := cfg.DbUrl
 	redisAddr := cfg.RedisAddr
 	redisDb := cfg.RedisDb
+	jwtSecret := cfg.JwtSecret
 
+	utils.IntialseTokenGen(jwtSecret)
 	db.StartDb(dbUrl)
 	db.StartRedis(redisAddr, redisDb)
 
