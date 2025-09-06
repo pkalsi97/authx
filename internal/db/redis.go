@@ -61,6 +61,11 @@ func RedisGet(ctx context.Context, Id string) (*models.UserSignupData, error) {
 	var output models.UserSignupData
 
 	val, err := client.Get(ctx, key).Result()
+
+	if err == redis.Nil {
+		return nil, nil
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +74,9 @@ func RedisGet(ctx context.Context, Id string) (*models.UserSignupData, error) {
 		return nil, err
 	}
 	return &output, nil
+}
+
+func RedisDel(ctx context.Context, id string) error {
+	key := "user" + id
+	return client.Del(ctx, key).Err()
 }
