@@ -101,6 +101,7 @@ type UserSignupData struct {
 	EmailTries    int    `json:"email_tries"`
 	EmailOtp      string `json:"email_otp"`
 	Userpool      string `json:"userpool"`
+	Password      string `json:"password"`
 }
 
 type UserSignupVerification struct {
