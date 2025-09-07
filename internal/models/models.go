@@ -141,3 +141,20 @@ type RefreshSession struct {
 	Refreshtoken string `json:"refresh_token"`
 	Idtoken      string `json:"id_token"`
 }
+
+type PasswordResetRequest struct {
+	Userpool string `json:"userpool"`
+	Email    string `json:"email"`
+}
+
+type PasswordResetVerify struct {
+	Id       string `json:"id"`
+	Answer   string `json:"answer"`
+	Password string `json:"password"`
+}
+
+type PasswordResetCache struct {
+	Id    string `json:"id"`
+	Otp   string `json:"Otp"`
+	Tries int    `json:"tries"`
+}
