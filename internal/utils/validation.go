@@ -5,23 +5,22 @@ import (
 	"unicode"
 )
 
-func IsValidPhone(phone string) bool {
-
+func IsValidPhone(phone string) (string, bool) {
 	if len(phone) > 10 {
 		phone = phone[len(phone)-10:]
 	}
 
 	if len(phone) != 10 {
-		return false
+		return "", false
 	}
 
 	for _, ch := range phone {
 		if !unicode.IsDigit(ch) {
-			return false
+			return "", false
 		}
 	}
 
-	return true
+	return "+91" + phone, true
 }
 
 func IsValidEmail(email string) bool {
