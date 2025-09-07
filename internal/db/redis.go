@@ -6,7 +6,6 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/pkalsi97/authx/internal/models"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -46,7 +45,7 @@ func GetRedis() *redis.Client {
 	return client
 }
 
-func RedisSet(ctx context.Context, Id string, input *models.UserSignupData) error {
+func RedisSet[T any](ctx context.Context, Id string, input T) error {
 	key := "user" + Id
 	data, err := json.Marshal(input)
 	if err != nil {
@@ -56,20 +55,17 @@ func RedisSet(ctx context.Context, Id string, input *models.UserSignupData) erro
 	return client.Set(ctx, key, data, 0).Err()
 }
 
-func RedisGet(ctx context.Context, Id string) (*models.UserSignupData, error) {
+func RedisGet[T any](ctx context.Context, Id string) (*T, error) {
 	key := "user" + Id
-	var output models.UserSignupData
-
 	val, err := client.Get(ctx, key).Result()
-
 	if err == redis.Nil {
 		return nil, nil
 	}
-
 	if err != nil {
 		return nil, err
 	}
 
+	var output T
 	if err := json.Unmarshal([]byte(val), &output); err != nil {
 		return nil, err
 	}
