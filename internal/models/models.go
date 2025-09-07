@@ -113,3 +113,31 @@ type SignupComplete struct {
 	ID       string `json:"id"`
 	Password string `json:"password"`
 }
+
+type PasswordLogin struct {
+	Userpool string `json:"userpool"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type OtpLoginRequest struct {
+	Userpool   string `json:"userpool"`
+	Method     string `json:"method"`
+	Credential string `json:"credential"`
+}
+
+type OtpLoginVerify struct {
+	Id     string `json:"id"`
+	Answer string `json:"answer"`
+}
+
+type OtpCacheData struct {
+	Method string `json:"userpool"`
+	Otp    string `json:"otp"`
+	Tries  int    `json:"tries"`
+}
+
+type RefreshSession struct {
+	Refreshtoken string `json:"refresh_token"`
+	Idtoken      string `json:"id_token"`
+}
