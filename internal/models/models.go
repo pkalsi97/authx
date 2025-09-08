@@ -9,16 +9,6 @@ type ErrorResponse struct {
 	Details string `json:"details,omitempty"`
 }
 
-type OwnerInput struct {
-	Email        string `json:"email"`
-	Name         string `json:"name"`
-	Organization string `json:"organization"`
-}
-
-type UserPoolInput struct {
-	Name   string                 `json:"name"`
-	Schema map[string]interface{} `json:"schema,omitempty"`
-}
 type Owner struct {
 	ID           string    `json:"id"`
 	Email        string    `json:"email"`
@@ -88,73 +78,4 @@ type AuditLog struct {
 	TargetID   string                 `json:"target_id,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata"`
 	CreatedAt  time.Time              `json:"created_at"`
-}
-
-type UserSignupData struct {
-	ID            string `json:"id"`
-	Phone         string `json:"phone"`
-	PhoneVerified bool   `json:"phone_verified"`
-	PhoneTries    int    `json:"phone_tries"`
-	PhoneOtp      string `json:"phone_otp"`
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
-	EmailTries    int    `json:"email_tries"`
-	EmailOtp      string `json:"email_otp"`
-	Userpool      string `json:"userpool"`
-	Password      string `json:"password"`
-}
-
-type UserSignupVerification struct {
-	ID     string `json:"id"`
-	Answer string `json:"answer"`
-}
-
-type SignupComplete struct {
-	ID       string `json:"id"`
-	Password string `json:"password"`
-}
-
-type PasswordLogin struct {
-	Userpool string `json:"userpool"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type OtpLoginRequest struct {
-	Userpool   string `json:"userpool"`
-	Method     string `json:"method"`
-	Credential string `json:"credential"`
-}
-
-type OtpLoginVerify struct {
-	Id     string `json:"id"`
-	Answer string `json:"answer"`
-}
-
-type OtpCacheData struct {
-	Method string `json:"userpool"`
-	Otp    string `json:"otp"`
-	Tries  int    `json:"tries"`
-}
-
-type RefreshSession struct {
-	Refreshtoken string `json:"refresh_token"`
-	Idtoken      string `json:"id_token"`
-}
-
-type PasswordResetRequest struct {
-	Userpool string `json:"userpool"`
-	Email    string `json:"email"`
-}
-
-type PasswordResetVerify struct {
-	Id       string `json:"id"`
-	Answer   string `json:"answer"`
-	Password string `json:"password"`
-}
-
-type PasswordResetCache struct {
-	Id    string `json:"id"`
-	Otp   string `json:"Otp"`
-	Tries int    `json:"tries"`
 }
