@@ -87,30 +87,30 @@ func UserPoolRouter(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string  "Failed to insert owner"
 // @Router       /api/v1/admin/owners [post]
 func createAdmin(w http.ResponseWriter, r *http.Request) {
-	var input models.OwnerInput
+	var input models.CreateAdminRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, "invalid Request Body", err.Error())
 		return
 	}
 
-	var owner models.Owner
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`INSERT INTO owners (email, name, organization)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, email, name, organization, created_at, updated_at`,
-		input.Email, input.Name, input.Organization,
-	)
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
 
-	if err := row.Scan(&owner.ID, &owner.Email, &owner.Organization, &owner.Name, &owner.CreatedAt, &owner.UpdatedAt); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Falied to insert owner", err.Error())
+	var result models.CreateAdminResponse
+	query := `INSERT INTO owners (email, name, organization) VALUES ($1, $2, $3) RETURNING id, created_at`
+	args := []any{input.Email, input.Name, input.Organization}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &result.Id, &result.CreatedAt); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database Error", resp.Message)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(owner)
+	json.NewEncoder(w).Encode(result)
 }
 
 // CreateAPIKey godoc
@@ -126,29 +126,23 @@ func createAdmin(w http.ResponseWriter, r *http.Request) {
 
 func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 	apiKey, err := utils.GenerateAPIKey()
-
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Falied to Generate Key", err.Error())
 		return
 	}
 
-	var ownerApiKey models.OwnerAPIKey
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`INSERT INTO owners_api_keys (owner_id, key_hash)
-		VALUES ($1, $2)
-		RETURNING id, owner_id, key_hash, created_at, revoked`,
-		adminId, apiKey,
-	)
-
-	if err := row.Scan(&ownerApiKey.ID, &ownerApiKey.OwnerID, &ownerApiKey.KeyHash, &ownerApiKey.CreatedAt, &ownerApiKey.Revoked); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Falied to insert owner", err.Error())
+	var response models.CreateAPIKeyResponse
+	query := `INSERT INTO owners_api_keys (owner_id, key_hash) VALUES ($1, $2) RETURNING key_hash, created_at`
+	args := []any{adminId, apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &response.Key, &response.CreatedAt); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database Error", resp.Message)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ownerApiKey)
+	json.NewEncoder(w).Encode(response)
 }
 
 // DisableAPIKey godoc
@@ -164,25 +158,18 @@ func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 // @Failure      500  {object}  models.ErrorResponse "Server error"
 // @Router       /api/v1/admin/owners/{adminId}/apikeys/{apiKey}/disable [patch]
 func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey string) {
-	var ownerApiKey models.OwnerAPIKey
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`UPDATE owners_api_keys
-		SET revoked = TRUE
-		WHERE owner_id = $1 AND key_hash = $2
-		RETURNING id, owner_id, key_hash, created_at, revoked;
-		`,
-		adminId, apiKey,
-	)
+	var response models.DisableAPIKeyResponse
 
-	if err := row.Scan(&ownerApiKey.ID, &ownerApiKey.OwnerID, &ownerApiKey.KeyHash, &ownerApiKey.CreatedAt, &ownerApiKey.Revoked); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to revoke API key", err.Error())
+	query := `UPDATE owners_api_keys SET revoked = TRUE WHERE owner_id = $1 AND key_hash = $2 RETURNING id, revoked;`
+	args := []any{adminId, apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &response.Id, &response.Revoked); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database Error", resp.Message)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ownerApiKey)
+	json.NewEncoder(w).Encode(response)
 }
 
 // CreateUserPool godoc
@@ -199,43 +186,40 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 // @Failure      500  {object}  models.ErrorResponse "Failed to create user pool"
 // @Router       /api/v1/admin/user-pools/create [post]
 func createUserpool(w http.ResponseWriter, r *http.Request) {
-	var input models.UserPoolInput
+	var input models.CreateUserPoolRequest
 
+	apiKey := r.Header.Get("X-API-KEY")
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, "invalid Request Body", err.Error())
 		return
 	}
 
-	apiKey := r.Header.Get("X-API-KEY")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
 	var ownerId string
-
-	err := db.GetDb().QueryRow(
-		r.Context(),
-		`SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`,
-		apiKey,
-	).Scan(&ownerId)
-
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", err.Error())
+	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
+	args := []any{apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &ownerId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
 		return
 	}
 
-	var userpool models.UserPool
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`INSERT INTO user_pools (owner_id, name, schema)
-		VALUES ($1, $2, $3)
-		RETURNING id, owner_id, name, schema, created_at, updated_at`,
-		ownerId, input.Name, input.Schema,
-	)
-
-	if err := row.Scan(&userpool.ID, &userpool.OwnerID, &userpool.Name, &userpool.Schema, &userpool.CreatedAt, &userpool.UpdatedAt); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to Create Userpool key", err.Error())
+	var result models.CreateUserPoolResponse
+	query = `INSERT INTO user_pools (owner_id, name, schema) VALUES ($1, $2, $3) RETURNING id, created_at`
+	args = []any{ownerId, input.Name, input.Schema}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &result.Id, &result.CreatedAt); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(userpool)
+	json.NewEncoder(w).Encode(result)
 }
 
 // UpdateUserPool godoc
@@ -254,42 +238,42 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  models.ErrorResponse "Failed to update user pool"
 // @Router       /api/v1/admin/user-pools/{userpoolId} [patch]
 func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
-	var input models.UserPoolInput
+	var input models.UpdateUserPoolRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
 
-	apiKey := r.Header.Get("X-API-KEY")
-	var ownerId string
-	err := db.GetDb().QueryRow(
-		r.Context(),
-		`SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`,
-		apiKey,
-	).Scan(&ownerId)
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", err.Error())
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
-	var userpool models.UserPool
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`UPDATE user_pools
-		 SET name = $1, schema = $2, updated_at = NOW()
-		 WHERE id = $3 AND owner_id = $4
-		 RETURNING id, owner_id, name, schema, created_at, updated_at`,
-		input.Name, input.Schema, userpoolId, ownerId,
-	)
+	apiKey := r.Header.Get("X-API-KEY")
+	var ownerId string
+	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
+	args := []any{apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &ownerId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
+		return
+	}
 
-	if err := row.Scan(&userpool.ID, &userpool.OwnerID, &userpool.Name, &userpool.Schema, &userpool.CreatedAt, &userpool.UpdatedAt); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to update user pool", err.Error())
+	var response models.UpdateUserPoolResponse
+	query = `UPDATE user_pools
+		SET name = $1, schema = $2, updated_at = NOW()
+		WHERE id = $3 AND owner_id = $4
+		RETURNING id`
+	args = []any{input.Name, input.Schema, userpoolId, ownerId}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &response.Id); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Database error", resp.Message)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(userpool)
+	json.NewEncoder(w).Encode(response)
 }
 
 // DeleteUserPool godoc
@@ -307,14 +291,21 @@ func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 // @Router       /api/v1/admin/user-pools/{userpoolId} [delete]
 func deleteUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
-	err := db.GetDb().QueryRow(
-		r.Context(),
-		`SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`,
-		apiKey,
-	).Scan(&ownerId)
-	if err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", err.Error())
+	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
+	args := []any{apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &ownerId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
+		return
+	}
+
+	query = `DELETE FROM user_pools WHERE id = $1 AND owner_id = $2`
+	args = []any{userpoolId, ownerId}
+	if err := db.QueryRowAndScan(r.Context(), query, args); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Database Error", resp.Message)
 		return
 	}
 
