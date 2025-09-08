@@ -2,14 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/models"
 	"github.com/pkalsi97/authx/internal/utils"
@@ -29,7 +27,8 @@ import (
 // @Router       /api/v1/auth/signup/phone/request [post]
 
 func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.UserSignupData
+	var input models.SignupPhoneRequest
+	var user models.UserSignupData
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -41,36 +40,34 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
-	cleanPhone, valid := utils.IsValidPhone(input.Phone)
 
-	if input.Userpool == "" || !valid {
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
+	var cleanPhone string
+	var valid bool
+	if cleanPhone, valid = utils.IsValidPhone(input.Phone); !valid {
 		utils.WriteError(w, http.StatusBadRequest, "Missing/Invalid Essential Inputs", "")
 		return
 	}
 
-	input.Phone = cleanPhone
-
 	var userPoolExists bool
-	queryUserpool := `SELECT EXISTS(SELECT 1 FROM user_pools WHERE id=$1)`
-	err := db.GetDb().QueryRow(r.Context(), queryUserpool, input.Userpool).Scan(&userPoolExists)
-	if !userPoolExists {
-		utils.WriteError(w, http.StatusBadRequest, "Unable to proceed with the Signup", "Userpool does not exist")
-		return
-	}
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	var phoneExists bool
+	query := `SELECT EXISTS(SELECT 1 FROM user_pools WHERE id=$1)`
+	args := []any{input.Userpool}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &userPoolExists); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database error", resp.Message)
 		return
 	}
 
-	var phoneExists bool
-	queryPhone := `SELECT EXISTS(SELECT 1 FROM users WHERE phone=$1)`
-	err = db.GetDb().QueryRow(r.Context(), queryPhone, input.Phone).Scan(&phoneExists)
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
-		return
-	}
-	if phoneExists {
-		utils.WriteError(w, http.StatusConflict, "Phone number already registered", "")
+	query = `SELECT EXISTS(SELECT 1 FROM users WHERE phone=$1)`
+	args = []any{input.Phone}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &phoneExists); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database error", resp.Message)
 		return
 	}
 
@@ -79,13 +76,9 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Generate OTP", err.Error())
 		return
 	}
+	user.Phone, user.Userpool, user.PhoneOtp, user.PhoneTries, user.EmailTries, user.ID = cleanPhone, input.Userpool, otp, 3, 3, uuid.NewString()
 
-	input.PhoneOtp = otp
-	input.PhoneTries = 3
-	input.EmailTries = 3
-	input.ID = uuid.NewString()
-
-	if err := db.RedisSet(r.Context(), input.ID, &input); err != nil {
+	if err := db.RedisSet(r.Context(), user.ID, &user); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Generate OTP", err.Error())
 		return
 	}
@@ -95,14 +88,14 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.SignupPhoneResponse{
+		Id:      user.ID,
+		Message: "OTP sent successfully",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
-	resp := map[string]string{
-		"id":      input.ID,
-		"message": "OTP sent successfully",
-	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(response)
 }
 
 // SignupEmailOtpRequestHandler godoc
@@ -118,7 +111,7 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/signup/email/request [post]
 
 func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.UserSignupData
+	var input models.SignupEmailRequest
 	var user *models.UserSignupData
 
 	if r.Method != http.MethodPost {
@@ -132,20 +125,22 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.ID == "" || !utils.IsValidEmail(input.Email) || input.Password == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", "")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
+	if !utils.IsValidEmail(input.Email) {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Email", "Please enter the correct email")
 		return
 	}
 
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`
-	err := db.GetDb().QueryRow(r.Context(), query, input.Email).Scan(&exists)
-	if !exists {
-		utils.WriteError(w, http.StatusBadRequest, "Unable to proceed with the Signup", "Userpool does not exist")
-		return
-	}
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{input.Email}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &exists); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, resp.Status, "Database error", resp.Message)
 		return
 	}
 
@@ -172,9 +167,7 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.Email = input.Email
-	user.EmailOtp = otp
-	user.Password = hashedPassword
+	user.Email, user.EmailOtp, user.Password = input.Email, otp, hashedPassword
 
 	if err := db.RedisSet(r.Context(), input.ID, user); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Generate OTP", err.Error())
@@ -186,13 +179,14 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.SignupEmailResponse{
+		Id:      user.ID,
+		Message: "OTP sent successfully",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"id":      input.ID,
-		"message": "OTP sent successfully",
-	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(response)
 }
 
 // SignupPhoneOtpVerifyHandler godoc
@@ -223,8 +217,8 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.ID == "" || input.Answer == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", "")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
@@ -233,6 +227,7 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Verify OTP", err.Error())
 		return
 	}
+
 	if user == nil {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Signup ID", "No signup session found for this ID")
 		return
@@ -262,13 +257,13 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	response := &models.UserSignupResponse{
+		Id:      user.ID,
+		Message: "OTP sent successfully",
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"id":      input.ID,
-		"message": "OTP Verified",
-	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(response)
 }
 
 // SignupVerifyAndCompleteHandler godoc
@@ -299,16 +294,16 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.ID == "" || input.Answer == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", "")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
+
 	user, err := db.RedisGet[models.UserSignupData](r.Context(), input.ID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Verify OTP", err.Error())
 		return
 	}
-
 	if user == nil {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Signup ID", "No signup session found for this ID")
 		return
@@ -344,19 +339,17 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbClient := db.GetDb()
 	userpool := user.Userpool
 	var schema map[string]interface{}
-
-	row := dbClient.QueryRow(
-		r.Context(),
-		`SELECT schema FROM user_pools WHERE id=$1 `,
-		userpool,
-	)
-
 	var schemaBytes []byte
-	if err := row.Scan(&schemaBytes); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", err.Error())
+	var userId string
+	var tokenID string
+
+	query := `SELECT schema FROM user_pools WHERE id=$1 `
+	args := []any{userpool}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &schemaBytes); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
 		return
 	}
 
@@ -371,17 +364,13 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row = db.GetDb().QueryRow(
-		r.Context(),
-		`INSERT INTO users(user_pool_id, email, email_verified, phone, phone_verified, password_hash, metadata)
-    VALUES($1,$2,$3,$4,$5,$6,$7)
-    RETURNING id`,
-		userpool, user.Email, user.EmailVerified, user.Phone, user.PhoneVerified, user.Password, metadataBytes,
-	)
-
-	var userId string
-	if err := row.Scan(&userId); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", err.Error())
+	query = `INSERT INTO users(user_pool_id, email, email_verified, phone, phone_verified, password_hash, metadata)
+    			VALUES($1,$2,$3,$4,$5,$6,$7)
+    			RETURNING id`
+	args = []any{userpool, user.Email, user.EmailVerified, user.Phone, user.PhoneVerified, user.Password, metadataBytes}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &userId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
 		return
 	}
 
@@ -401,32 +390,28 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row = dbClient.QueryRow(
-		r.Context(),
-		`INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
-		VALUES($1,$2,$3)
-		RETURNING id`,
-		userId, hashedToken, time.Now().Add(365*time.Minute),
-	)
-
-	var tokenID string
-	err = row.Scan(&tokenID)
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Signup complete but unable to login", err.Error())
+	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
+			VALUES($1,$2,$3)
+			RETURNING id`
+	args = []any{userId, hashedToken, time.Now().Add(365 * time.Minute)}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
 		return
+	}
+
+	response := &models.SignupCompleteResponse{
+		Id:           input.ID,
+		UserId:       userId,
+		Message:      "Account Creation Succesful",
+		IdToken:      tokens.IDToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"id":            input.ID,
-		"user_id":       userId,
-		"message":       "Account Creation Succesful",
-		"id_token":      tokens.IDToken,
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(response)
 }
 
 // PasswordLoginHandler godoc
@@ -444,7 +429,7 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/login/password [post]
 
 func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.PasswordLogin
+	var input models.PasswordLoginRequest
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -457,18 +442,18 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
 	var id, phone, password_hash string
 
 	query := `SELECT id, phone, password_hash FROM users WHERE email=$1 AND user_pool_id=$2`
-	row := db.GetDb().QueryRow(r.Context(), query, input.Email, input.Userpool)
-
-	err := row.Scan(&id, &phone, &password_hash)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "User not found", "")
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{input.Email, input.Userpool}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &id, &phone, &password_hash); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -484,16 +469,16 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.LoginResponse{
+		Message:      "Login Successful",
+		IdToken:      tokens.IDToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"message":       "Login Succesful!",
-		"id_token":      tokens.IDToken,
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-	}
-	json.NewEncoder(w).Encode(resp)
-
+	json.NewEncoder(w).Encode(response)
 }
 
 // LoginOtpRequestHandler godoc
@@ -522,6 +507,12 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
 		return
 	}
+
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
 	var query, id string
 
 	switch input.Method {
@@ -534,15 +525,10 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row := db.GetDb().QueryRow(r.Context(), query, input.Credential, input.Userpool)
-
-	err := row.Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "User not found", "")
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{input.Credential, input.Userpool}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &id); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -568,14 +554,14 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.OtpLoginResponse{
+		Id:      id,
+		Message: "OTP sent successfully",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"id":      id,
-		"message": "OTP sent successfully",
-	}
-	json.NewEncoder(w).Encode(resp)
-
+	json.NewEncoder(w).Encode(response)
 }
 
 // LoginOtpVerifyHandler godoc
@@ -592,7 +578,7 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/login/otp/verify [post]
 
 func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.OtpLoginVerify
+	var input models.OtpLoginVerifyRequest
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -605,8 +591,8 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Id == "" || input.Answer == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", "id and answer are required")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
@@ -638,8 +624,10 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 
 	var email, phone string
 	query := `SELECT email, phone FROM users WHERE id=$1`
-	if err := db.GetDb().QueryRow(r.Context(), query, input.Id).Scan(&email, &phone); err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{input.Id}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &email, &phone); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -662,34 +650,30 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row := db.GetDb().QueryRow(
-		r.Context(),
-		`INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
-		VALUES($1,$2,$3)
-		RETURNING id`,
-		input.Id, hashedToken, time.Now().Add(365*time.Minute),
-	)
-
 	var tokenID string
-	err = row.Scan(&tokenID)
-	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
+	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
+			VALUES($1,$2,$3)
+			RETURNING id`
+	args = []any{input.Id, hashedToken, time.Now().Add(365 * time.Minute)}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
 	if err = db.RedisDel(r.Context(), input.Id); err != nil {
 		log.Printf("Unable to delete Key/Value in redis %s", err.Error())
 	}
+	response := &models.LoginResponse{
+		Message:      "Login Successful",
+		IdToken:      tokens.IDToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"message":       "Login successfully",
-		"id_token":      tokens.IDToken,
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-	}
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(response)
 }
 
 // SessionRefreshHandler godoc
@@ -707,7 +691,7 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/session/refresh [post]
 
 func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
-	var token models.RefreshSession
+	var token models.RefreshSessionRequest
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -720,8 +704,8 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if token.Refreshtoken == "" || token.Idtoken == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", "id and answer are required")
+	if err := utils.ValidateInput(token); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
@@ -733,13 +717,10 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	var tokenHash string
 	query := `SELECT token_hash FROM refresh_tokens WHERE user_id=$1 AND revoked=false`
-	err = db.GetDb().QueryRow(r.Context(), query, userId).Scan(&tokenHash)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "User not found", "")
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{userId}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenHash); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -750,13 +731,10 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	var email, phone string
 	query = `SELECT email, phone FROM users WHERE id=$1`
-	err = db.GetDb().QueryRow(r.Context(), query, userId).Scan(&email, &phone)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "Email/ Phone", "")
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args = []any{userId}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &email, &phone); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -766,15 +744,15 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.RefreshSessionResponse{
+		Message:     "Session Refresh successfully",
+		IdToken:     newTokens.IDToken,
+		AccessToken: newTokens.AccessToken,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"message":      "Session Refresh successfully",
-		"id_token":     newTokens.IDToken,
-		"access_token": newTokens.AccessToken,
-	}
-	json.NewEncoder(w).Encode(resp)
-
+	json.NewEncoder(w).Encode(response)
 }
 
 // LogoutHandler godoc
@@ -791,7 +769,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/logout [post]
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.RefreshSession
+	var input models.LogoutRequest
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -804,8 +782,8 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Idtoken == "" || input.Refreshtoken == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", "Missing Id/Refresh Token")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
@@ -857,20 +835,22 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !utils.IsValidEmail(input.Email) || input.Userpool == "" {
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+		return
+	}
+
+	if !utils.IsValidEmail(input.Email) {
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", "Missing Email/userpool")
 		return
 	}
 
 	var userId string
 	query := `SELECT id FROM users WHERE email=$1 AND user_pool_id=$2`
-	err := db.GetDb().QueryRow(r.Context(), query, input.Email, input.Userpool).Scan(&userId)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			utils.WriteError(w, http.StatusNotFound, "No user Id found", "Unable to reset password")
-			return
-		}
-		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
+	args := []any{input.Email, input.Userpool}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &userId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -896,14 +876,13 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response := &models.PasswordResetResponse{
+		Id:      userId,
+		Message: "OTP SENT",
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"message": "OTP SENT",
-		"id":      userId,
-	}
-	json.NewEncoder(w).Encode(resp)
-
+	json.NewEncoder(w).Encode(response)
 }
 
 // PasswordResetCompleteHandler godoc
@@ -920,7 +899,7 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/v1/auth/password/reset [post]
 
 func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.PasswordResetVerify
+	var input models.PasswordResetVerifyRequest
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -933,8 +912,8 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.Answer == "" || input.Id == "" || input.Password == "" {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", "Missing Email/userpool")
+	if err := utils.ValidateInput(input); err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
 		return
 	}
 
