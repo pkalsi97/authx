@@ -42,6 +42,97 @@ type UpdateUserPoolResponse struct {
 	Id string `json:"id"`
 }
 
+type SignupPhoneRequest struct {
+	Userpool string `json:"userpool" validate:"required"`
+	Phone    string `json:"phone" validate:"required"`
+}
+
+type SignupPhoneResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type SignupEmailRequest struct {
+	ID       string `json:"id" validate:"required"`
+	Email    string `json:"email" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type SignupEmailResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type UserSignupVerification struct {
+	ID     string `json:"id" validate:"required"`
+	Answer string `json:"answer" validate:"required"`
+}
+
+type UserSignupResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type SignupCompleteResponse struct {
+	Id           string `json:"id"`
+	UserId       string `json:"user_id"`
+	Message      string `json:"message"`
+	IdToken      string `json:"id_token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type PasswordLoginRequest struct {
+	Userpool string `json:"userpool" validate:"required"`
+	Email    string `json:"email" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type LoginResponse struct {
+	Message      string `json:"message"`
+	IdToken      string `json:"id_token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type OtpLoginRequest struct {
+	Userpool   string `json:"userpool" validate:"required"`
+	Method     string `json:"method" validate:"required"`
+	Credential string `json:"credential" validate:"required"`
+}
+
+type OtpLoginResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type OtpLoginVerifyRequest struct {
+	Id     string `json:"id" validate:"required"`
+	Answer string `json:"answer" validate:"required"`
+}
+
+type OtpCacheData struct {
+	Method string `json:"userpool"`
+	Otp    string `json:"otp"`
+	Tries  int    `json:"tries"`
+}
+
+type RefreshSessionRequest struct {
+	Refreshtoken string `json:"refresh_token" validate:"required"`
+	Idtoken      string `json:"id_token" validate:"required"`
+}
+
+type RefreshSessionResponse struct {
+	Message     string `json:"message"`
+	IdToken     string `json:"id_token"`
+	AccessToken string `json:"access_token"`
+}
+
+type LogoutRequest struct {
+	Refreshtoken string `json:"refresh_token" validate:"required"`
+	Idtoken      string `json:"id_token" validate:"required"`
+}
+
 type UserSignupData struct {
 	ID            string `json:"id"`
 	Phone         string `json:"phone"`
@@ -56,53 +147,20 @@ type UserSignupData struct {
 	Password      string `json:"password"`
 }
 
-type UserSignupVerification struct {
-	ID     string `json:"id"`
-	Answer string `json:"answer"`
-}
-
-type SignupComplete struct {
-	ID       string `json:"id"`
-	Password string `json:"password"`
-}
-
-type PasswordLogin struct {
-	Userpool string `json:"userpool"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type OtpLoginRequest struct {
-	Userpool   string `json:"userpool"`
-	Method     string `json:"method"`
-	Credential string `json:"credential"`
-}
-
-type OtpLoginVerify struct {
-	Id     string `json:"id"`
-	Answer string `json:"answer"`
-}
-
-type OtpCacheData struct {
-	Method string `json:"userpool"`
-	Otp    string `json:"otp"`
-	Tries  int    `json:"tries"`
-}
-
-type RefreshSession struct {
-	Refreshtoken string `json:"refresh_token"`
-	Idtoken      string `json:"id_token"`
-}
-
 type PasswordResetRequest struct {
-	Userpool string `json:"userpool"`
-	Email    string `json:"email"`
+	Userpool string `json:"userpool" validate:"required"`
+	Email    string `json:"email" validate:"required"`
 }
 
-type PasswordResetVerify struct {
-	Id       string `json:"id"`
-	Answer   string `json:"answer"`
-	Password string `json:"password"`
+type PasswordResetResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type PasswordResetVerifyRequest struct {
+	Id       string `json:"id" validate:"required"`
+	Answer   string `json:"answer" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 type PasswordResetCache struct {
