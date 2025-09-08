@@ -24,6 +24,8 @@ func main() {
 	jwtSecret := cfg.JwtSecret
 
 	utils.IntialseTokenGen(jwtSecret)
+	utils.InitaliseValidator()
+
 	db.StartDb(dbUrl)
 	db.StartRedis(redisAddr, redisDb)
 
