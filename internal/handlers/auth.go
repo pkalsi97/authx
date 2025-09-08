@@ -994,5 +994,4 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		"message": "Password Reset",
 	}
 	json.NewEncoder(w).Encode(resp)
-
 }
