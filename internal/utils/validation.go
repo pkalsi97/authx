@@ -3,7 +3,19 @@ package utils
 import (
 	"strings"
 	"unicode"
+
+	"github.com/go-playground/validator/v10"
 )
+
+var Validate *validator.Validate
+
+func InitaliseValidator() {
+	Validate = validator.New()
+}
+
+func ValidateInput(input interface{}) error {
+	return Validate.Struct(input)
+}
 
 func IsValidPhone(phone string) (string, bool) {
 	if len(phone) > 10 {
