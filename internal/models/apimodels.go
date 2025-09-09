@@ -115,6 +115,7 @@ type OtpCacheData struct {
 	Method string `json:"userpool"`
 	Otp    string `json:"otp"`
 	Tries  int    `json:"tries"`
+	UserId string `json:"user_id"`
 }
 
 type RefreshSessionRequest struct {
@@ -164,7 +165,33 @@ type PasswordResetVerifyRequest struct {
 }
 
 type PasswordResetCache struct {
-	Id    string `json:"id"`
 	Otp   string `json:"Otp"`
 	Tries int    `json:"tries"`
+}
+
+type UserPasswordResetRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required"`
+}
+
+type UserCredentialRequest struct {
+	Credential string `json:"credential" validate:"required,oneof=phone email"`
+	Value      string `json:"value" validate:"required"`
+}
+
+type UserCredentialResponse struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+}
+
+type UserCredentialVerifyRequest struct {
+	Id     string `json:"id" validate:"required"`
+	Answer string `json:"answer" validate:"required"`
+}
+
+type CredentialResetCache struct {
+	Otp        string `json:"Otp"`
+	Tries      int    `json:"tries"`
+	Credential string `json:"credential"`
+	Value      string `json:"value"`
 }
