@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pkalsi97/authx/internal/models"
 )
 
 var pool *pgxpool.Pool
@@ -45,7 +47,6 @@ func QueryRowAndScan(ctx context.Context, query string, args []any, dest ...any)
 
 // MapDbError maps Postgres errors (or pgx wrapped errors) to HTTP-friendly responses
 func MapDbError(err error) DBErrorResponse {
-	fmt.Printf("%v", err)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DBErrorResponse{Status: http.StatusNotFound, Message: "Record not found"}
 	}
@@ -104,4 +105,43 @@ func MapDbError(err error) DBErrorResponse {
 	}
 
 	return DBErrorResponse{Status: http.StatusInternalServerError, Message: "Database error"}
+}
+
+func GetUserRolesAndPermissions(ctx context.Context, userID string) (roles []string, permissions []string, err error) {
+	query := `
+        SELECT r.name, r.permissions
+        FROM roles r
+        JOIN user_roles ur ON ur.role_id = r.id
+        WHERE ur.user_id = $1
+    `
+
+	rows, err := pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("database query error: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var r models.RoleAndPermissions
+		var permJSON []byte
+
+		if err := rows.Scan(&r.Name, &permJSON); err != nil {
+			return nil, nil, fmt.Errorf("scan error: %w", err)
+		}
+
+		if permJSON != nil {
+			if err := json.Unmarshal(permJSON, &r.Permissions); err != nil {
+				return nil, nil, fmt.Errorf("json unmarshal error: %w", err)
+			}
+		}
+
+		roles = append(roles, r.Name)
+		permissions = append(permissions, r.Permissions...)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return roles, permissions, nil
 }
