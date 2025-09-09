@@ -235,9 +235,9 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 
 	answer := input.Answer
 	otp := user.PhoneOtp
-	user.PhoneTries--
 
 	if answer != otp {
+		user.PhoneTries--
 		if user.PhoneTries <= 0 {
 			utils.WriteError(w, http.StatusInternalServerError, "Sign-Up Failed", "Retry attempts exhausted")
 			db.RedisDel(r.Context(), input.ID)
@@ -311,9 +311,9 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	answer := input.Answer
 	otp := user.EmailOtp
-	user.EmailTries--
 
 	if answer != otp {
+		user.EmailTries--
 		if user.EmailTries <= 0 {
 			utils.WriteError(w, http.StatusInternalServerError, "Sign-Up Failed", "Retry attempts exhausted")
 			db.RedisDel(r.Context(), input.ID)
@@ -373,8 +373,34 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
 		return
 	}
+	var roleId string
+	var permissionsJSON []byte
+	var permissions []string
 
-	tokens, err := utils.GenerateTokens(userId, user.Email, user.Phone)
+	query = `SELECT id, permissions From roles WHERE user_pool_id=$1 AND NAME='user'`
+	args = []any{userpool}
+
+	if err := db.QueryRowAndScan(r.Context(), query, args, &roleId, &permissionsJSON); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
+		return
+	}
+
+	if err := json.Unmarshal(permissionsJSON, &permissions); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", err.Error())
+		return
+	}
+
+	var userRoleID string
+	query = `INSERT INTO user_roles(user_id,role_id) VALUES ($1, $2) RETURNING id`
+	args = []any{userId, roleId}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &userRoleID); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
+		return
+	}
+
+	tokens, err := utils.GenerateTokens(userId, user.Email, user.Phone, permissions, []string{"user"})
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Signup complete but unable to login", err.Error())
 		return
@@ -463,7 +489,13 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := utils.GenerateTokens(id, input.Email, phone)
+	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), id)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Login", err.Error())
+		return
+	}
+
+	tokens, err := utils.GenerateTokens(id, input.Email, phone, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Login", err.Error())
 		return
@@ -513,7 +545,7 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var query, id string
+	var query, userid string
 
 	switch input.Method {
 	case "phone":
@@ -526,7 +558,7 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	args := []any{input.Credential, input.Userpool}
-	if err := db.QueryRowAndScan(r.Context(), query, args, &id); err != nil {
+	if err := db.QueryRowAndScan(r.Context(), query, args, &userid); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
@@ -542,9 +574,11 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Method: input.Method,
 		Otp:    otp,
 		Tries:  3,
+		UserId: userid,
 	}
+	cacheid := uuid.NewString()
 
-	if err := db.RedisSet(r.Context(), id, data); err != nil {
+	if err := db.RedisSet(r.Context(), cacheid, data); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Request Failed", err.Error())
 		return
 	}
@@ -555,7 +589,7 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := &models.OtpLoginResponse{
-		Id:      id,
+		Id:      cacheid,
 		Message: "OTP sent successfully",
 	}
 
@@ -606,8 +640,8 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.Tries--
 	if input.Answer != cache.Otp {
+		cache.Tries--
 		if cache.Tries <= 0 {
 			utils.WriteError(w, http.StatusInternalServerError, "Login Failed, To many wrong attempt", "Tries Left = 0")
 			db.RedisDel(r.Context(), input.Id)
@@ -615,7 +649,7 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		message := fmt.Sprintf("Attempts left %d", cache.Tries)
 		utils.WriteError(w, http.StatusBadRequest, "Please enter the right Otp", message)
-		if err := db.RedisSet(r.Context(), input.Id, input); err != nil {
+		if err := db.RedisSet(r.Context(), input.Id, cache); err != nil {
 			utils.WriteError(w, http.StatusInternalServerError, "Unable to Generate OTP", err.Error())
 			return
 		}
@@ -624,21 +658,27 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 
 	var email, phone string
 	query := `SELECT email, phone FROM users WHERE id=$1`
-	args := []any{input.Id}
+	args := []any{cache.UserId}
 	if err := db.QueryRowAndScan(r.Context(), query, args, &email, &phone); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
-	tokens, err := utils.GenerateTokens(input.Id, email, phone)
+	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), cache.UserId)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Login", err.Error())
+		return
+	}
+
+	tokens, err := utils.GenerateTokens(cache.UserId, email, phone, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
 		return
 	}
 
 	query = `DELETE FROM refresh_tokens WHERE user_id=$1`
-	_, err = db.GetDb().Exec(r.Context(), query, input.Id)
+	_, err = db.GetDb().Exec(r.Context(), query, cache.UserId)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
 		return
@@ -654,7 +694,7 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
 			VALUES($1,$2,$3)
 			RETURNING id`
-	args = []any{input.Id, hashedToken, time.Now().Add(365 * time.Minute)}
+	args = []any{cache.UserId, hashedToken, time.Now().Add(365 * time.Minute)}
 	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
@@ -738,7 +778,13 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newTokens, err := utils.RefreshTokens(userId, email, phone)
+	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), userId)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Database error", "code x")
+		return
+	}
+
+	newTokens, err := utils.RefreshTokens(userId, email, phone, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
 		return
@@ -861,12 +907,12 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cache := &models.PasswordResetCache{
-		Id:    userId,
 		Otp:   otp,
 		Tries: 3,
 	}
+	cacheid := uuid.NewString()
 
-	if err := db.RedisSet(r.Context(), userId+"reset", cache); err != nil {
+	if err := db.RedisSet(r.Context(), cacheid, cache); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to reset password", err.Error())
 		return
 	}
@@ -877,7 +923,7 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := &models.PasswordResetResponse{
-		Id:      userId,
+		Id:      cacheid,
 		Message: "OTP SENT",
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -917,7 +963,7 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache, err := db.RedisGet[models.PasswordResetCache](r.Context(), input.Id+"reset")
+	cache, err := db.RedisGet[models.PasswordResetCache](r.Context(), input.Id)
 
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to verify OTP", err.Error())
@@ -928,8 +974,8 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cache.Tries--
 	if input.Answer != cache.Otp {
+		cache.Tries--
 		if cache.Tries <= 0 {
 			utils.WriteError(w, http.StatusInternalServerError, "Login Failed, To many wrong attempt", "Tries Left = 0")
 			db.RedisDel(r.Context(), input.Id)
