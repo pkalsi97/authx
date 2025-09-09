@@ -187,8 +187,12 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 // @Router       /api/v1/admin/user-pools/create [post]
 func createUserpool(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateUserPoolRequest
-
 	apiKey := r.Header.Get("X-API-KEY")
+	if apiKey == "" {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+		return
+	}
+
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.WriteError(w, http.StatusBadRequest, "invalid Request Body", err.Error())
 		return
@@ -214,6 +218,18 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 	if err := db.QueryRowAndScan(r.Context(), query, args, &result.Id, &result.CreatedAt); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
+		return
+	}
+
+	roleQuery := `
+		INSERT INTO roles (user_pool_id, name, permissions)
+		VALUES
+			($1, 'user',  '["profile:read", "profile:update", "password:reset"]'::jsonb),
+			($1, 'admin', '["profile:read", "profile:update", "password:reset", "users:manage"]'::jsonb);
+`
+	if _, err := db.GetDb().Exec(r.Context(), roleQuery, result.Id); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Failed to seed default roles", resp.Message)
 		return
 	}
 
@@ -298,14 +314,6 @@ func deleteUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 	if err := db.QueryRowAndScan(r.Context(), query, args, &ownerId); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
-		return
-	}
-
-	query = `DELETE FROM user_pools WHERE id = $1 AND owner_id = $2`
-	args = []any{userpoolId, ownerId}
-	if err := db.QueryRowAndScan(r.Context(), query, args); err != nil {
-		resp := db.MapDbError(err)
-		utils.WriteError(w, http.StatusUnauthorized, "Database Error", resp.Message)
 		return
 	}
 
