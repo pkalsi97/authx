@@ -61,6 +61,11 @@ type UserRole struct {
 	RoleID string `json:"role_id"`
 }
 
+type RoleAndPermissions struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+}
+
 type RefreshToken struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
