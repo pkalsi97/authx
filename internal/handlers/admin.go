@@ -74,17 +74,16 @@ func UserPoolRouter(w http.ResponseWriter, r *http.Request) {
 
 -----------------------
 */
-
 // CreateAdmin godoc
-// @Summary      Create an owner
-// @Description  Create a new owner in the system
-// @Tags         owners
+// @Summary      Create an admin
+// @Description  Create a new admin in the system
+// @Tags         admins
 // @Accept       json
 // @Produce      json
-// @Param        owner  body      models.OwnerInput  true  "Owner input"
-// @Success      201  {object}  models.Owner
-// @Failure      400  {string}  string  "invalid Request Body"
-// @Failure      500  {string}  string  "Failed to insert owner"
+// @Param        admin  body      models.CreateAdminRequest  true  "Admin input"
+// @Success      201  {object}  models.CreateAdminResponse
+// @Failure      400  {object}  models.ErrorResponse "Invalid request body or validation error"
+// @Failure      500  {object}  models.ErrorResponse "Database error"
 // @Router       /api/v1/admin/owners [post]
 func createAdmin(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateAdminRequest
@@ -119,7 +118,7 @@ func createAdmin(w http.ResponseWriter, r *http.Request) {
 // @Tags         owners
 // @Produce      json
 // @Param        adminId   path      string  true  "Owner/Admin ID"
-// @Success      201  {object}  models.OwnerAPIKey  "Created API Key"
+// @Success      201  {object}  models.CreateAPIKeyResponse "Created API Key"
 // @Failure      400  {object}  models.ErrorResponse "Invalid request"
 // @Failure      500  {object}  models.ErrorResponse "Server error"
 // @Router       /api/v1/admin/owners/{adminId}/apikeys [post]
@@ -153,7 +152,7 @@ func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 // @Produce      json
 // @Param        adminId   path      string  true  "Owner/Admin ID"
 // @Param        apiKey    path      string  true  "API Key value to disable"
-// @Success      200  {object}  models.OwnerAPIKey  "Updated API Key with revoked=true"
+// @Success      200  {object}  models.DisableAPIKeyResponse "API Key revoked successfully"
 // @Failure      400  {object}  models.ErrorResponse "Invalid request"
 // @Failure      500  {object}  models.ErrorResponse "Server error"
 // @Router       /api/v1/admin/owners/{adminId}/apikeys/{apiKey}/disable [patch]
@@ -173,18 +172,19 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 }
 
 // CreateUserPool godoc
-// @Summary      Create a new user pool
-// @Description  Creates a new user pool for the owner identified by the API key. The schema will be stored as JSON.
+// @Summary      Create a user pool
+// @Description  Create a new user pool for grouping users
 // @Tags         userpools
 // @Accept       json
 // @Produce      json
-// @Param        X-API-KEY  header    string            true  "Owner API Key"
-// @Param        userPool    body      models.UserPoolInput  true  "User Pool input"
-// @Success      200  {object}  models.UserPool
+// @Param        X-API-KEY   header    string                   true  "Owner API Key"
+// @Param        userPool    body      models.CreateUserPoolRequest  true  "User Pool input"
+// @Success      201  {object}  models.CreateUserPoolResponse
 // @Failure      400  {object}  models.ErrorResponse "Invalid request body"
 // @Failure      401  {object}  models.ErrorResponse "Invalid API Key"
-// @Failure      500  {object}  models.ErrorResponse "Failed to create user pool"
-// @Router       /api/v1/admin/user-pools/create [post]
+// @Failure      500  {object}  models.ErrorResponse "Database error"
+// @Router       /api/v1/admin/user-pools [post]
+
 func createUserpool(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateUserPoolRequest
 	apiKey := r.Header.Get("X-API-KEY")
@@ -244,10 +244,10 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 // @Tags         userpools
 // @Accept       json
 // @Produce      json
-// @Param        X-API-KEY   header    string               true  "Owner API Key"
-// @Param        userpoolId  path      string               true  "User Pool ID"
-// @Param        userPool    body      models.UserPoolInput true  "Updated User Pool data"
-// @Success      200  {object}  models.UserPool
+// @Param        X-API-KEY   header    string                      true  "Owner API Key"
+// @Param        userpoolId  path      string                      true  "User Pool ID"
+// @Param        userPool    body      models.UpdateUserPoolRequest true  "Updated User Pool data"
+// @Success      200  {object}  models.UpdateUserPoolResponse
 // @Failure      400  {object}  models.ErrorResponse "Invalid request body"
 // @Failure      401  {object}  models.ErrorResponse "Invalid API Key"
 // @Failure      404  {object}  models.ErrorResponse "User pool not found"

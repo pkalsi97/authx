@@ -19,11 +19,11 @@ import (
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.UserSignupData  true  "Signup phone request data"
-// @Success      200    {object}  map[string]string       "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse    "Missing/Invalid essential inputs"
-// @Failure      409    {object}  models.ErrorResponse    "Phone number already registered"
-// @Failure      500    {object}  models.ErrorResponse    "Database or server error"
+// @Param        input  body      models.SignupPhoneRequest   true  "Signup phone request data"
+// @Success      200    {object}  models.SignupPhoneResponse  "OTP sent successfully"
+// @Failure      400    {object}  models.ErrorResponse        "Missing/Invalid essential inputs"
+// @Failure      409    {object}  models.ErrorResponse        "Phone number already registered"
+// @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/phone/request [post]
 
 func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -104,10 +104,10 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.UserSignupData  true  "Signup email request data"
-// @Success      200    {object}  map[string]string       "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse    "Invalid request body or signup ID"
-// @Failure      500    {object}  models.ErrorResponse    "Database or server error"
+// @Param        input  body      models.SignupEmailRequest   true  "Signup email request data"
+// @Success      200    {object}  models.SignupEmailResponse  "OTP sent successfully"
+// @Failure      400    {object}  models.ErrorResponse        "Invalid request body or signup ID"
+// @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/email/request [post]
 
 func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -190,16 +190,15 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignupPhoneOtpVerifyHandler godoc
-// @Summary      Verify phone OTP
-// @Description  Verifies the OTP sent to the phone during signup. Marks phone as verified if OTP is correct.
+// @Summary      Verify phone signup OTP
+// @Description  Verifies the phone OTP and marks the phone as verified in the signup session.
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
 // @Param        input  body      models.UserSignupVerification  true  "Phone OTP verification request"
-// @Success      200    {object}  map[string]string              "OTP Verified successfully"
+// @Success      200    {object}  models.UserSignupResponse      "Phone verified successfully"
 // @Failure      400    {object}  models.ErrorResponse           "Invalid signup ID or wrong OTP"
-// @Failure      406    {object}  models.ErrorResponse           "Retry attempts exhausted"
-// @Failure      500    {object}  models.ErrorResponse           "Server or database error"
+// @Failure      500    {object}  models.ErrorResponse           "Server error"
 // @Router       /api/v1/auth/signup/phone/verify [post]
 
 func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
@@ -272,11 +271,11 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.UserSignupVerification  true  "Email OTP verification request"
-// @Success      200    {object}  map[string]string              "Signup completed successfully with tokens"
-// @Failure      400    {object}  models.ErrorResponse           "Invalid signup ID or wrong OTP"
-// @Failure      406    {object}  models.ErrorResponse           "Phone not verified"
-// @Failure      500    {object}  models.ErrorResponse           "Server or database error"
+// @Param        input  body      models.UserSignupVerification   true  "Email OTP verification request"
+// @Success      200    {object}  models.SignupCompleteResponse   "Signup completed successfully with tokens"
+// @Failure      400    {object}  models.ErrorResponse            "Invalid signup ID or wrong OTP"
+// @Failure      406    {object}  models.ErrorResponse            "Phone not verified"
+// @Failure      500    {object}  models.ErrorResponse            "Server or database error"
 // @Router       /api/v1/auth/signup/complete [post]
 
 func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -446,12 +445,12 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.PasswordLogin   true  "Password login request"
-// @Success      200    {object}  map[string]string      "Login successful with tokens"
-// @Failure      400    {object}  models.ErrorResponse   "Invalid request body"
-// @Failure      401    {object}  models.ErrorResponse   "Incorrect password"
-// @Failure      404    {object}  models.ErrorResponse   "User not found"
-// @Failure      500    {object}  models.ErrorResponse   "Server or database error"
+// @Param        input  body      models.PasswordLoginRequest  true  "Password login request"
+// @Success      200    {object}  models.LoginResponse         "Login successful with tokens"
+// @Failure      400    {object}  models.ErrorResponse         "Invalid request body"
+// @Failure      401    {object}  models.ErrorResponse         "Incorrect password"
+// @Failure      404    {object}  models.ErrorResponse         "User not found"
+// @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/auth/login/password [post]
 
 func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -519,11 +518,11 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.OtpLoginRequest  true  "Login OTP request"
-// @Success      200    {object}  map[string]string       "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse    "Invalid request body or method"
-// @Failure      404    {object}  models.ErrorResponse    "User not found"
-// @Failure      500    {object}  models.ErrorResponse    "Server or database error"
+// @Param        input  body      models.OtpLoginRequest   true  "Login OTP request"
+// @Success      200    {object}  models.OtpLoginResponse  "OTP sent successfully"
+// @Failure      400    {object}  models.ErrorResponse     "Invalid request body or method"
+// @Failure      404    {object}  models.ErrorResponse     "User not found"
+// @Failure      500    {object}  models.ErrorResponse     "Server or database error"
 // @Router       /api/v1/auth/login/otp/request [post]
 
 func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -604,11 +603,11 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.OtpLoginVerify   true  "Login OTP verification request"
-// @Success      200    {object}  map[string]string       "Login successful with tokens"
-// @Failure      400    {object}  models.ErrorResponse    "Invalid input or wrong OTP"
-// @Failure      404    {object}  models.ErrorResponse    "OTP session expired or user not found"
-// @Failure      500    {object}  models.ErrorResponse    "Server or database error"
+// @Param        input  body      models.OtpLoginVerifyRequest  true  "Login OTP verification request"
+// @Success      200    {object}  models.LoginResponse          "Login successful with tokens"
+// @Failure      400    {object}  models.ErrorResponse          "Invalid input or wrong OTP"
+// @Failure      404    {object}  models.ErrorResponse          "OTP session expired or user not found"
+// @Failure      500    {object}  models.ErrorResponse          "Server or database error"
 // @Router       /api/v1/auth/login/otp/verify [post]
 
 func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
@@ -807,11 +806,11 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.RefreshSession   true  "Logout request"
-// @Success      200    {object}  map[string]string       "Logout successful"
-// @Failure      400    {object}  models.ErrorResponse    "Invalid request body"
-// @Failure      403    {object}  models.ErrorResponse    "Unable to extract user ID"
-// @Failure      500    {object}  models.ErrorResponse    "Database error"
+// @Param        input  body      models.LogoutRequest  true  "Logout request"
+// @Success      200    {object}  map[string]string     "Logout successful"
+// @Failure      400    {object}  models.ErrorResponse  "Invalid request body"
+// @Failure      403    {object}  models.ErrorResponse  "Unable to extract user ID"
+// @Failure      500    {object}  models.ErrorResponse  "Database error"
 // @Router       /api/v1/auth/logout [post]
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -860,11 +859,11 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.PasswordResetRequest  true  "Password reset request"
-// @Success      200    {object}  map[string]string            "OTP sent for password reset"
-// @Failure      400    {object}  models.ErrorResponse         "Invalid request body"
-// @Failure      404    {object}  models.ErrorResponse         "User not found"
-// @Failure      500    {object}  models.ErrorResponse         "Server or database error"
+// @Param        input  body      models.PasswordResetRequest   true  "Password reset request"
+// @Success      200    {object}  models.PasswordResetResponse  "OTP sent for password reset"
+// @Failure      400    {object}  models.ErrorResponse          "Invalid request body"
+// @Failure      404    {object}  models.ErrorResponse          "User not found"
+// @Failure      500    {object}  models.ErrorResponse          "Server or database error"
 // @Router       /api/v1/auth/password/request [post]
 
 func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -937,11 +936,11 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.PasswordResetVerify   true  "Password reset verification"
-// @Success      200    {object}  map[string]string            "Password reset successful"
-// @Failure      400    {object}  models.ErrorResponse         "Invalid request body or wrong OTP"
-// @Failure      404    {object}  models.ErrorResponse         "OTP session expired or user not found"
-// @Failure      500    {object}  models.ErrorResponse         "Server or database error"
+// @Param        input  body      models.PasswordResetVerifyRequest  true  "Password reset verification"
+// @Success      200    {object}  map[string]string                  "Password reset successful"
+// @Failure      400    {object}  models.ErrorResponse               "Invalid request body or wrong OTP"
+// @Failure      404    {object}  models.ErrorResponse               "OTP session expired or user not found"
+// @Failure      500    {object}  models.ErrorResponse               "Server or database error"
 // @Router       /api/v1/auth/password/reset [post]
 
 func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
