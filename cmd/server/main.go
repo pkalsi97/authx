@@ -32,7 +32,7 @@ func main() {
 	mux := server.SetUpRoutes()
 	server := &http.Server{
 		Addr:    ":" + port,
-		Handler: mux,
+		Handler: utils.LoggingMiddleware(mux),
 	}
 
 	sigChan := make(chan os.Signal, 1)
