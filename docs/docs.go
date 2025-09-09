@@ -9,7 +9,16 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -17,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/api/v1/admin/owners": {
             "post": {
-                "description": "Create a new owner in the system",
+                "description": "Create a new admin in the system",
                 "consumes": [
                     "application/json"
                 ],
@@ -25,17 +34,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "owners"
+                    "admins"
                 ],
-                "summary": "Create an owner",
+                "summary": "Create an admin",
                 "parameters": [
                     {
-                        "description": "Owner input",
-                        "name": "owner",
+                        "description": "Admin input",
+                        "name": "admin",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.OwnerInput"
+                            "$ref": "#/definitions/models.CreateAdminRequest"
                         }
                     }
                 ],
@@ -43,19 +52,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/models.Owner"
+                            "$ref": "#/definitions/models.CreateAdminResponse"
                         }
                     },
                     "400": {
-                        "description": "invalid Request Body",
+                        "description": "Invalid request body or validation error",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Failed to insert owner",
+                        "description": "Database error",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -92,9 +101,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Updated API Key with revoked=true",
+                        "description": "API Key revoked successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.OwnerAPIKey"
+                            "$ref": "#/definitions/models.DisableAPIKeyResponse"
                         }
                     },
                     "400": {
@@ -105,65 +114,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Server error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/admin/user-pools/create": {
-            "post": {
-                "description": "Creates a new user pool for the owner identified by the API key. The schema will be stored as JSON.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "userpools"
-                ],
-                "summary": "Create a new user pool",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Owner API Key",
-                        "name": "X-API-KEY",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "User Pool input",
-                        "name": "userPool",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UserPoolInput"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.UserPool"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Invalid API Key",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to create user pool",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -263,7 +213,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UserPoolInput"
+                            "$ref": "#/definitions/models.UpdateUserPoolRequest"
                         }
                     }
                 ],
@@ -271,7 +221,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.UserPool"
+                            "$ref": "#/definitions/models.UpdateUserPoolResponse"
                         }
                     },
                     "400": {
@@ -303,6 +253,47 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.CreateAdminRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "organization"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.CreateAdminResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DisableAPIKeyResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "revoked": {
+                    "type": "boolean"
+                }
+            }
+        },
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -314,96 +305,29 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Owner": {
+        "models.UpdateUserPoolRequest": {
             "type": "object",
+            "required": [
+                "name",
+                "schema"
+            ],
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
                 "name": {
-                    "type": "string"
-                },
-                "organization": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.OwnerAPIKey": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "key_hash": {
-                    "type": "string"
-                },
-                "owner_id": {
-                    "type": "string"
-                },
-                "revoked": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "models.OwnerInput": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "organization": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.UserPool": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "owner_id": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
                 },
                 "schema": {
                     "type": "object",
                     "additionalProperties": true
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
-        "models.UserPoolInput": {
+        "models.UpdateUserPoolResponse": {
             "type": "object",
             "properties": {
-                "name": {
+                "id": {
                     "type": "string"
-                },
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": true
                 }
             }
         }
@@ -412,12 +336,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
-	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Version:          "1.0",
+	Host:             "localhost:8080",
+	BasePath:         "/api/v1",
+	Schemes:          []string{"http", "https"},
+	Title:            "AuthX API",
+	Description:      "Authentication and credential management APIs.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
