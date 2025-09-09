@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,7 +19,9 @@ type IdClaims struct {
 }
 
 type AccessClaims struct {
-	UserId string `json:"sub"`
+	UserId string   `json:"sub"`
+	Scopes []string `json:"scopes,omitempty"`
+	Roles  []string `json:"roles,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -37,7 +40,7 @@ func IntialseTokenGen(key string) {
 	jwtSecret = []byte(key)
 }
 
-func GenerateTokens(userId, email, phone string) (*TokenTuple, error) {
+func GenerateTokens(userId, email, phone string, scopes []string, roles []string) (*TokenTuple, error) {
 
 	now := time.Now()
 
@@ -55,6 +58,8 @@ func GenerateTokens(userId, email, phone string) (*TokenTuple, error) {
 
 	accessClaims := &AccessClaims{
 		UserId: userId,
+		Scopes: scopes,
+		Roles:  roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -82,7 +87,7 @@ func GenerateTokens(userId, email, phone string) (*TokenTuple, error) {
 	}, nil
 }
 
-func RefreshTokens(userId, email, phone string) (*RefreshPair, error) {
+func RefreshTokens(userId, email, phone string, scopes []string, roles []string) (*RefreshPair, error) {
 	now := time.Now()
 
 	idClaims := &IdClaims{
@@ -137,6 +142,10 @@ func ExtractUserIDFromIDToken(idToken string) (string, error) {
 		return "", fmt.Errorf("failed to parse ID token: %w", err)
 	}
 
+	if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
+		return "", fmt.Errorf("ID token is expired")
+	}
+
 	if !token.Valid {
 		return "", fmt.Errorf("ID token is invalid")
 	}
@@ -146,4 +155,40 @@ func ExtractUserIDFromIDToken(idToken string) (string, error) {
 	}
 
 	return claims.UserId, nil
+}
+
+func ValidateAccessToken(accessToken string, requiredScopes []string, requiredRoles []string) error {
+	claims := &AccessClaims{}
+
+	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to parse access token: %w", err)
+	}
+
+	if !token.Valid {
+		return fmt.Errorf("invalid access token")
+	}
+
+	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
+		return fmt.Errorf("access token expired")
+	}
+
+	for _, scope := range requiredScopes {
+		if !slices.Contains(claims.Scopes, scope) {
+			return fmt.Errorf("access token missing required scope: %s", scope)
+		}
+	}
+
+	for _, role := range requiredRoles {
+		if !slices.Contains(claims.Roles, role) {
+			return fmt.Errorf("access token missing required role: %s", role)
+		}
+	}
+
+	return nil
 }
