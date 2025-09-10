@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkalsi97/authx/internal/core"
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/models"
 	"github.com/pkalsi97/authx/internal/utils"
@@ -399,7 +400,7 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := utils.GenerateTokens(userId, user.Email, user.Phone, permissions, []string{"user"})
+	tokens, err := utils.GenerateTokens(userId, user.Email, user.Phone, userpool, permissions, []string{"user"})
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Signup complete but unable to login", err.Error())
 		return
@@ -424,6 +425,8 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Signup", resp.Message)
 		return
 	}
+
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserSignup, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	response := &models.SignupCompleteResponse{
 		Id:           input.ID,
@@ -494,11 +497,13 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := utils.GenerateTokens(id, input.Email, phone, permissions, roles)
+	tokens, err := utils.GenerateTokens(id, input.Email, phone, input.Userpool, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Login", err.Error())
 		return
 	}
+
+	core.CaptureAudit(r.Context(), input.Userpool, id, id, core.ActionUserLogin, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	response := &models.LoginResponse{
 		Message:      "Login Successful",
@@ -544,22 +549,29 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var query, userid string
+	var query, userid, email, phone string
 
 	switch input.Method {
 	case "phone":
-		query = `SELECT id FROM users WHERE phone=$1 AND user_pool_id=$2`
+		phone = input.Credential
+		query = `SELECT id, email FROM users WHERE phone=$1 AND user_pool_id=$2`
+		args := []any{phone, input.Userpool}
+		if err := db.QueryRowAndScan(r.Context(), query, args, &userid, &email); err != nil {
+			resp := db.MapDbError(err)
+			utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+			return
+		}
 	case "email":
-		query = `SELECT id FROM users WHERE email=$1 AND user_pool_id=$2`
+		email = input.Credential
+		query = `SELECT id, phone FROM users WHERE email=$1 AND user_pool_id=$2`
+		args := []any{email, input.Userpool}
+		if err := db.QueryRowAndScan(r.Context(), query, args, &userid, &phone); err != nil {
+			resp := db.MapDbError(err)
+			utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+			return
+		}
 	default:
 		utils.WriteError(w, http.StatusBadRequest, "Invalid Method", "use phone/email")
-		return
-	}
-
-	args := []any{input.Credential, input.Userpool}
-	if err := db.QueryRowAndScan(r.Context(), query, args, &userid); err != nil {
-		resp := db.MapDbError(err)
-		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -570,10 +582,13 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := &models.OtpCacheData{
-		Method: input.Method,
-		Otp:    otp,
-		Tries:  3,
-		UserId: userid,
+		Method:   input.Method,
+		Otp:      otp,
+		Tries:    3,
+		UserId:   userid,
+		Email:    email,
+		Phone:    phone,
+		Userpool: input.Userpool,
 	}
 	cacheid := uuid.NewString()
 
@@ -655,28 +670,20 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var email, phone string
-	query := `SELECT email, phone FROM users WHERE id=$1`
-	args := []any{cache.UserId}
-	if err := db.QueryRowAndScan(r.Context(), query, args, &email, &phone); err != nil {
-		resp := db.MapDbError(err)
-		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
-		return
-	}
-
+	email, phone, userpool := cache.Email, cache.Phone, cache.Userpool
 	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), cache.UserId)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Login", err.Error())
 		return
 	}
 
-	tokens, err := utils.GenerateTokens(cache.UserId, email, phone, permissions, roles)
+	tokens, err := utils.GenerateTokens(cache.UserId, email, phone, userpool, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
 		return
 	}
 
-	query = `DELETE FROM refresh_tokens WHERE user_id=$1`
+	query := `DELETE FROM refresh_tokens WHERE user_id=$1`
 	_, err = db.GetDb().Exec(r.Context(), query, cache.UserId)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
@@ -693,7 +700,7 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
 			VALUES($1,$2,$3)
 			RETURNING id`
-	args = []any{cache.UserId, hashedToken, time.Now().Add(365 * time.Minute)}
+	args := []any{cache.UserId, hashedToken, time.Now().Add(365 * time.Minute)}
 	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
 		resp := db.MapDbError(err)
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
@@ -703,6 +710,9 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	if err = db.RedisDel(r.Context(), input.Id); err != nil {
 		log.Printf("Unable to delete Key/Value in redis %s", err.Error())
 	}
+
+	core.CaptureAudit(r.Context(), userpool, cache.UserId, cache.UserId, core.ActionUserSignup, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
+
 	response := &models.LoginResponse{
 		Message:      "Login Successful",
 		IdToken:      tokens.IDToken,
@@ -748,7 +758,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := utils.ExtractUserIDFromIDToken(token.Idtoken)
+	userId, userpool, err := utils.ExtractUserIDFromIDToken(token.Idtoken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", "")
 		return
@@ -783,12 +793,12 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newTokens, err := utils.RefreshTokens(userId, email, phone, permissions, roles)
+	newTokens, err := utils.RefreshTokens(userId, email, phone, userpool, permissions, roles)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
 		return
 	}
-
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionSessionRefresh, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 	response := &models.RefreshSessionResponse{
 		Message:     "Session Refresh successfully",
 		IdToken:     newTokens.IDToken,
@@ -832,7 +842,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := utils.ExtractUserIDFromIDToken(input.Idtoken)
+	userId, userpool, err := utils.ExtractUserIDFromIDToken(input.Idtoken)
 	if err != nil {
 		utils.WriteError(w, http.StatusForbidden, "Unable to Logout", err.Error())
 		return
@@ -844,6 +854,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
 		return
 	}
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserLogout, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -906,8 +917,10 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cache := &models.PasswordResetCache{
-		Otp:   otp,
-		Tries: 3,
+		UserID:   userId,
+		Otp:      otp,
+		Tries:    3,
+		Userpool: input.Userpool,
 	}
 	cacheid := uuid.NewString()
 
@@ -920,7 +933,7 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to reset password", err.Error())
 		return
 	}
-
+	core.CaptureAudit(r.Context(), cache.Userpool, cache.UserID, cache.UserID, core.ActionPasswordResetReq, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 	response := &models.PasswordResetResponse{
 		Id:      cacheid,
 		Message: "OTP SENT",
@@ -996,8 +1009,7 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `UPDATE users SET password_hash=$1 WHERE id=$2`
-
-	cmdTag, err := db.GetDb().Exec(r.Context(), query, hashedPassword, input.Id)
+	cmdTag, err := db.GetDb().Exec(r.Context(), query, hashedPassword, cache.UserID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Database error", err.Error())
 		return
@@ -1011,6 +1023,8 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	if err = db.RedisDel(r.Context(), input.Id); err != nil {
 		log.Printf("Redis Del Failed %s", err.Error())
 	}
+
+	core.CaptureAudit(r.Context(), cache.Userpool, cache.UserID, cache.UserID, core.ActionPasswordChanged, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
