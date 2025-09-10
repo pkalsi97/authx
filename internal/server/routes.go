@@ -11,7 +11,6 @@ func SetUpRoutes() *http.ServeMux {
 	registerAdminRoutes(mux)
 	registerRbacRoutes(mux)
 	registerAuthRoutes(mux)
-	registerOauthRoutes(mux)
 	registerUserRoutes(mux)
 	return mux
 }
@@ -58,20 +57,6 @@ func registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/signup/complete", handlers.SignupVerifyAndCompleteHandler)
 	mux.HandleFunc("/api/v1/auth/password/request", handlers.PasswordResetRequestHandler)
 	mux.HandleFunc("/api/v1/auth/password/reset", handlers.PasswordResetCompleteHandler)
-}
-
-/*
----------------------
-
-	OAuth Routes
-
------------------------
-*/
-func registerOauthRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/auth/oauth/google/redirect", handlers.GoogleOauthRedirectHandler)
-	mux.HandleFunc("/api/v1/auth/oauth/google/callback", handlers.GooleOauthCallbackHandler)
-	mux.HandleFunc("/api/v1/auth/oauth/git/redirect", handlers.GitOauthRedirectHandler)
-	mux.HandleFunc("/api/v1/auth/oauth/git/callback", handlers.GitOauthCallbackHandler)
 }
 
 /*
