@@ -35,7 +35,7 @@ func registerAdminRoutes(mux *http.ServeMux) {
 -----------------------
 */
 func registerRbacRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/user-pools/", handlers.RbacRouter)
+	mux.HandleFunc("/api/v1/rbac/", handlers.RbacRouter)
 }
 
 /*
