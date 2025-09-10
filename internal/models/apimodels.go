@@ -112,10 +112,13 @@ type OtpLoginVerifyRequest struct {
 }
 
 type OtpCacheData struct {
-	Method string `json:"userpool"`
-	Otp    string `json:"otp"`
-	Tries  int    `json:"tries"`
-	UserId string `json:"user_id"`
+	Method   string `json:"method"`
+	Otp      string `json:"otp"`
+	Tries    int    `json:"tries"`
+	UserId   string `json:"user_id"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Userpool string `json:"userpool"`
 }
 
 type RefreshSessionRequest struct {
@@ -165,8 +168,10 @@ type PasswordResetVerifyRequest struct {
 }
 
 type PasswordResetCache struct {
-	Otp   string `json:"Otp"`
-	Tries int    `json:"tries"`
+	UserID   string `json:"id"`
+	Otp      string `json:"Otp"`
+	Tries    int    `json:"tries"`
+	Userpool string `json:"userpool"`
 }
 
 type UserPasswordResetRequest struct {
