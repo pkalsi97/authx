@@ -75,6 +75,15 @@ type RefreshToken struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type AuditMetadata struct {
+	IP        string `json:"ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+	Method    string `json:"method,omitempty"`
+	Path      string `json:"path,omitempty"`
+	Query     string `json:"query,omitempty"`
+	Host      string `json:"host,omitempty"`
+}
+
 type AuditLog struct {
 	ID         string                 `json:"id"`
 	UserPoolID string                 `json:"user_pool_id"`
