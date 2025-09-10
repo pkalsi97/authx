@@ -12,9 +12,10 @@ import (
 var jwtSecret []byte
 
 type IdClaims struct {
-	UserId string `json:"sub"`
-	Phone  string `json:"phone"`
-	Email  string `json:"email"`
+	UserId   string `json:"sub"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
+	Userpool string `json:"userpool"`
 	jwt.RegisteredClaims
 }
 
@@ -40,14 +41,15 @@ func IntialseTokenGen(key string) {
 	jwtSecret = []byte(key)
 }
 
-func GenerateTokens(userId, email, phone string, scopes []string, roles []string) (*TokenTuple, error) {
+func GenerateTokens(userId, email, phone, userpool string, scopes []string, roles []string) (*TokenTuple, error) {
 
 	now := time.Now()
 
 	idClaims := &IdClaims{
-		UserId: userId,
-		Phone:  phone,
-		Email:  email,
+		UserId:   userId,
+		Phone:    phone,
+		Email:    email,
+		Userpool: userpool,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -87,13 +89,14 @@ func GenerateTokens(userId, email, phone string, scopes []string, roles []string
 	}, nil
 }
 
-func RefreshTokens(userId, email, phone string, scopes []string, roles []string) (*RefreshPair, error) {
+func RefreshTokens(userId, email, phone, userpool string, scopes []string, roles []string) (*RefreshPair, error) {
 	now := time.Now()
 
 	idClaims := &IdClaims{
-		UserId: userId,
-		Phone:  phone,
-		Email:  email,
+		UserId:   userId,
+		Phone:    phone,
+		Email:    email,
+		Userpool: userpool,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -128,7 +131,7 @@ func RefreshTokens(userId, email, phone string, scopes []string, roles []string)
 	}, nil
 }
 
-func ExtractUserIDFromIDToken(idToken string) (string, error) {
+func ExtractUserIDFromIDToken(idToken string) (string, string, error) {
 	claims := &IdClaims{}
 
 	token, err := jwt.ParseWithClaims(idToken, claims, func(token *jwt.Token) (interface{}, error) {
@@ -139,22 +142,22 @@ func ExtractUserIDFromIDToken(idToken string) (string, error) {
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("failed to parse ID token: %w", err)
+		return "", "", fmt.Errorf("failed to parse ID token: %w", err)
 	}
 
 	if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
-		return "", fmt.Errorf("ID token is expired")
+		return "", "", fmt.Errorf("ID token is expired")
 	}
 
 	if !token.Valid {
-		return "", fmt.Errorf("ID token is invalid")
+		return "", "", fmt.Errorf("ID token is invalid")
 	}
 
 	if claims.UserId == "" {
-		return "", fmt.Errorf("sub claim (user_id) missing in ID token")
+		return "", "", fmt.Errorf("sub claim (user_id) missing in ID token")
 	}
 
-	return claims.UserId, nil
+	return claims.UserId, claims.Userpool, nil
 }
 
 func ValidateAccessToken(accessToken string, requiredScopes []string, requiredRoles []string) error {
