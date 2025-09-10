@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/pkalsi97/authx/internal/core"
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/models"
 	"github.com/pkalsi97/authx/internal/utils"
@@ -52,7 +53,7 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
@@ -96,6 +97,7 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, resp.Status, "Database Error", resp.Message)
 		return
 	}
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionPasswordChanged, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 	response := map[string]string{
 		"message": "Password Reset Successful",
 	}
@@ -144,7 +146,7 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
@@ -186,9 +188,10 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserUpdateCredentialRequest, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
+
 	response.Id = cacheId
 	response.Message = "Otp Sent Successfully"
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
@@ -235,7 +238,7 @@ func CredentialVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
@@ -308,6 +311,8 @@ func CredentialVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"message": "Credential Reset Successful",
 	}
+
+	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserUpdateCredentialVerify, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
