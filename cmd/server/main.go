@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkalsi97/authx/internal/config"
+	"github.com/pkalsi97/authx/internal/core"
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/server"
 	"github.com/pkalsi97/authx/internal/utils"
@@ -47,7 +48,7 @@ func main() {
 	mux := server.SetUpRoutes()
 	server := &http.Server{
 		Addr:    ":" + port,
-		Handler: utils.LoggingMiddleware(mux),
+		Handler: core.LoggingMiddleware(mux),
 	}
 
 	sigChan := make(chan os.Signal, 1)
