@@ -3,7 +3,9 @@ package server
 import (
 	"net/http"
 
+	_ "github.com/pkalsi97/authx/docs"
 	"github.com/pkalsi97/authx/internal/handlers"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func SetUpRoutes() *http.ServeMux {
@@ -12,6 +14,9 @@ func SetUpRoutes() *http.ServeMux {
 	registerRbacRoutes(mux)
 	registerAuthRoutes(mux)
 	registerUserRoutes(mux)
+	// Swagger UI
+	mux.Handle("/api/v1/docs/", httpSwagger.WrapHandler)
+
 	return mux
 }
 
