@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type CreateAdminRequest struct {
 	Email        string `json:"email" validate:"required,email"`
@@ -199,4 +202,19 @@ type CredentialResetCache struct {
 	Tries      int    `json:"tries"`
 	Credential string `json:"credential"`
 	Value      string `json:"value"`
+}
+
+type RolesRow struct {
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Permissions json.RawMessage `json:"permissions"`
+}
+
+type CreateRoleRequest struct {
+	Name  string   `json:"name" validate:"required"`
+	Scope []string `json:"scope" validate:"required"`
+}
+
+type UpdateRoleRequest struct {
+	Scope []string `json:"scope" validate:"required"`
 }
