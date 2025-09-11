@@ -19,6 +19,9 @@ const (
 	ActionPasswordChanged             = "PASSWORD_CHANGED"
 	ActionRoleAssigned                = "ROLE_ASSIGNED"
 	ActionRoleRevoked                 = "ROLE_REVOKED"
+	ActionRoleCreated                 = "ROLE_CREATED"
+	ActionRoleUpdated                 = "ROLE_UPDATED"
+	ActionRoleDeleted                 = "ROLE_DELETED"
 )
 
 type AuditMetadata struct {
