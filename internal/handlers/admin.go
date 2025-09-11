@@ -77,14 +77,14 @@ func UserPoolRouter(w http.ResponseWriter, r *http.Request) {
 // CreateAdmin godoc
 // @Summary      Create an admin
 // @Description  Create a new admin in the system
-// @Tags         admins
+// @Tags         Admins
 // @Accept       json
 // @Produce      json
 // @Param        admin  body      models.CreateAdminRequest  true  "Admin input"
 // @Success      201  {object}  models.CreateAdminResponse
 // @Failure      400  {object}  models.ErrorResponse "Invalid request body or validation error"
 // @Failure      500  {object}  models.ErrorResponse "Database error"
-// @Router       /api/v1/admin/owners [post]
+// @Router       /api/v1/admin/owners/create [post]
 func createAdmin(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateAdminRequest
 
@@ -115,14 +115,14 @@ func createAdmin(w http.ResponseWriter, r *http.Request) {
 // CreateAPIKey godoc
 // @Summary      Generate an API key for an owner
 // @Description  Creates a new API key for the given owner/admin. The key is returned in plaintext once.
-// @Tags         owners
+// @Tags         Admins
+// @Accept       json
 // @Produce      json
 // @Param        adminId   path      string  true  "Owner/Admin ID"
 // @Success      201  {object}  models.CreateAPIKeyResponse "Created API Key"
 // @Failure      400  {object}  models.ErrorResponse "Invalid request"
 // @Failure      500  {object}  models.ErrorResponse "Server error"
 // @Router       /api/v1/admin/owners/{adminId}/apikeys [post]
-
 func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 	apiKey, err := utils.GenerateAPIKey()
 	if err != nil {
@@ -147,7 +147,7 @@ func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 // DisableAPIKey godoc
 // @Summary      Disable an API key
 // @Description  Marks an API key as revoked (revoked=true) for a specific owner/admin.
-// @Tags         owners
+// @Tags         Admins
 // @Accept       json
 // @Produce      json
 // @Param        adminId   path      string  true  "Owner/Admin ID"
@@ -174,17 +174,16 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 // CreateUserPool godoc
 // @Summary      Create a user pool
 // @Description  Create a new user pool for grouping users
-// @Tags         userpools
+// @Tags         Userpools
 // @Accept       json
 // @Produce      json
-// @Param        X-API-KEY   header    string                   true  "Owner API Key"
-// @Param        userPool    body      models.CreateUserPoolRequest  true  "User Pool input"
+// @Param        X-API-KEY   header    string                      true  "Owner API Key"
+// @Param        userPool    body      models.CreateUserPoolRequest true  "User Pool input"
 // @Success      201  {object}  models.CreateUserPoolResponse
 // @Failure      400  {object}  models.ErrorResponse "Invalid request body"
 // @Failure      401  {object}  models.ErrorResponse "Invalid API Key"
 // @Failure      500  {object}  models.ErrorResponse "Database error"
-// @Router       /api/v1/admin/user-pools [post]
-
+// @Router       /api/v1/admin/user-pools/create [post]
 func createUserpool(w http.ResponseWriter, r *http.Request) {
 	var input models.CreateUserPoolRequest
 	apiKey := r.Header.Get("X-API-KEY")
@@ -241,7 +240,7 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 // UpdateUserPool godoc
 // @Summary      Update a user pool
 // @Description  Updates the name or schema of an existing user pool identified by its ID. The owner is authenticated via X-API-KEY.
-// @Tags         userpools
+// @Tags         Userpools
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY   header    string                      true  "Owner API Key"
@@ -295,7 +294,7 @@ func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 // DeleteUserPool godoc
 // @Summary      Delete a user pool
 // @Description  Deletes an existing user pool identified by its ID. Only the owner with a valid API key can perform this action.
-// @Tags         userpools
+// @Tags         Userpools
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY   header    string  true  "Owner API Key"

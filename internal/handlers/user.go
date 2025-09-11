@@ -15,18 +15,17 @@ import (
 
 // UserPasswordResetHandler godoc
 // @Summary      Reset user password
-// @Description  Allows a logged-in user to reset their password by verifying old password and setting a new one.
-// @Tags         authentication
+// @Description  Allows a logged-in user to reset their password by verifying the old password and setting a new one.
+// @Tags         User-management
 // @Accept       json
 // @Produce      json
 // @Param        input  body      models.UserPasswordResetRequest  true  "Password reset request"
-// @Success      200    {object}  map[string]string                "Password Reset Successful"
-// @Failure      400    {object}  models.ErrorResponse             "Invalid request body or validation error"
-// @Failure      401    {object}  models.ErrorResponse             "Unauthorized or incorrect current password"
-// @Failure      404    {object}  models.ErrorResponse             "User not found"
-// @Failure      500    {object}  models.ErrorResponse             "Server or database error"
-// @Router       /api/v1/auth/password/reset [post]
-
+// @Success      200    {object}  map[string]string               "Password Reset Successful"
+// @Failure      400    {object}  models.ErrorResponse            "Invalid request body or validation error"
+// @Failure      401    {object}  models.ErrorResponse            "Unauthorized or incorrect current password"
+// @Failure      404    {object}  models.ErrorResponse            "User not found"
+// @Failure      500    {object}  models.ErrorResponse            "Server or database error"
+// @Router       /api/v1/users/password/reset [post]
 func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.UserPasswordResetRequest
 
@@ -108,17 +107,16 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 
 // CredentialRequestHandler godoc
 // @Summary      Request OTP for credential reset
-// @Description  Generates and sends an OTP for resetting user credentials (email or phone).
-// @Tags         authentication
+// @Description  Generates and sends an OTP for resetting a user credential (email or phone).
+// @Tags         User-management
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.UserCredentialRequest     true  "Credential reset request"
-// @Success      200    {object}  models.UserCredentialResponse    "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse             "Invalid request body or validation error"
-// @Failure      401    {object}  models.ErrorResponse             "Unauthorized or missing headers"
-// @Failure      500    {object}  models.ErrorResponse             "Server or database error"
-// @Router       /api/v1/auth/credential/request [post]
-
+// @Param        input  body      models.UserCredentialRequest  true  "Credential reset request containing credential type (email/phone) and value"
+// @Success      200    {object}  models.UserCredentialResponse "OTP sent successfully with cache ID"
+// @Failure      400    {object}  models.ErrorResponse         "Invalid request body or validation error"
+// @Failure      401    {object}  models.ErrorResponse         "Unauthorized (missing/invalid ID-TOKEN or ACCESS-TOKEN)"
+// @Failure      500    {object}  models.ErrorResponse         "Server or database error"
+// @Router       /api/v1/users/credential/request [post]
 func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.UserCredentialRequest
 	var response models.UserCredentialResponse
@@ -200,18 +198,17 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 // CredentialVerifyHandler godoc
 // @Summary      Verify OTP for credential reset
-// @Description  Verifies OTP and updates the requested credential (phone/email).
-// @Tags         authentication
+// @Description  Verifies OTP and updates the requested credential (phone/email) for the logged-in user.
+// @Tags         User-management
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.UserCredentialVerifyRequest true "Credential reset verification request"
-// @Success      200    {object}  map[string]string                  "Credential Reset Successful"
-// @Failure      400    {object}  models.ErrorResponse               "Invalid request body, wrong OTP, or validation error"
-// @Failure      401    {object}  models.ErrorResponse               "Unauthorized or missing headers"
-// @Failure      404    {object}  models.ErrorResponse               "OTP session not found or expired"
-// @Failure      500    {object}  models.ErrorResponse               "Server or database error"
-// @Router       /api/v1/auth/credential/verify [post]
-
+// @Param        input  body      models.UserCredentialVerifyRequest  true  "Credential reset verification request containing OTP and cache ID"
+// @Success      200    {object}  map[string]string                   "Credential Reset Successful"
+// @Failure      400    {object}  models.ErrorResponse                "Invalid request body, wrong OTP, or validation error"
+// @Failure      401    {object}  models.ErrorResponse                "Unauthorized (missing/invalid ID-TOKEN or ACCESS-TOKEN)"
+// @Failure      404    {object}  models.ErrorResponse                "OTP session not found or expired"
+// @Failure      500    {object}  models.ErrorResponse                "Server or database error"
+// @Router       /api/v1/users/credential/verify [post]
 func CredentialVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.UserCredentialVerifyRequest
 

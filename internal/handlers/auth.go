@@ -15,18 +15,17 @@ import (
 )
 
 // SignupPhoneOtpRequestHandler godoc
-// @Summary      Request phone signup OTP
-// @Description  Validates phone and userpool, generates an OTP, stores it in Redis, and sends it to the phone.
-// @Tags         authentication
+// @Summary      Request OTP for phone signup
+// @Description  Validates phone and user pool, generates an OTP, stores it in Redis, and sends it to the user's phone.
+// @Tags         Signup
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.SignupPhoneRequest   true  "Signup phone request data"
+// @Param        input  body      models.SignupPhoneRequest   true  "Signup phone request data including phone and userpool ID"
 // @Success      200    {object}  models.SignupPhoneResponse  "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse        "Missing/Invalid essential inputs"
+// @Failure      400    {object}  models.ErrorResponse        "Missing/Invalid essential inputs or validation error"
 // @Failure      409    {object}  models.ErrorResponse        "Phone number already registered"
 // @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/phone/request [post]
-
 func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.SignupPhoneRequest
 	var user models.UserSignupData
@@ -100,17 +99,17 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignupEmailOtpRequestHandler godoc
-// @Summary      Request email signup OTP
-// @Description  Validates signup session ID, email, and password, generates an OTP, stores it in Redis, and sends it to the email.
-// @Tags         authentication
+// @Summary      Request OTP for email signup
+// @Description  Validates signup session ID, email, and password, generates an OTP, stores it in Redis, and sends it to the user's email.
+// @Tags         Signup
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.SignupEmailRequest   true  "Signup email request data"
+// @Param        input  body      models.SignupEmailRequest   true  "Signup email request data including signup session ID, email, and password"
 // @Success      200    {object}  models.SignupEmailResponse  "OTP sent successfully"
-// @Failure      400    {object}  models.ErrorResponse        "Invalid request body or signup ID"
+// @Failure      400    {object}  models.ErrorResponse        "Invalid request body, missing fields, or invalid signup session ID"
+// @Failure      409    {object}  models.ErrorResponse        "Email already registered"
 // @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/email/request [post]
-
 func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.SignupEmailRequest
 	var user *models.UserSignupData
@@ -191,17 +190,16 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignupPhoneOtpVerifyHandler godoc
-// @Summary      Verify phone signup OTP
-// @Description  Verifies the phone OTP and marks the phone as verified in the signup session.
-// @Tags         authentication
-// @Accept       json
-// @Produce      json
-// @Param        input  body      models.UserSignupVerification  true  "Phone OTP verification request"
-// @Success      200    {object}  models.UserSignupResponse      "Phone verified successfully"
-// @Failure      400    {object}  models.ErrorResponse           "Invalid signup ID or wrong OTP"
-// @Failure      500    {object}  models.ErrorResponse           "Server error"
-// @Router       /api/v1/auth/signup/phone/verify [post]
-
+// @Summary Verify phone signup OTP
+// @Description Verifies the phone OTP and marks the phone as verified in the signup session.
+// @Tags Signup
+// @Accept json
+// @Produce json
+// @Param input body models.UserSignupVerification true "Phone OTP verification request"
+// @Success 200 {object} models.UserSignupResponse "Phone verified successfully"
+// @Failure 400 {object} models.ErrorResponse "Invalid signup ID or wrong OTP"
+// @Failure 500 {object} models.ErrorResponse "Server error"
+// @Router /api/v1/auth/signup/otp/phone/verify [post]
 func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.UserSignupVerification
 	var user *models.UserSignupData
@@ -267,18 +265,18 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SignupVerifyAndCompleteHandler godoc
-// @Summary      Verify email OTP and complete signup
-// @Description  Verifies the OTP sent to the email, ensures phone is verified, creates the user account in DB, generates tokens, and completes signup.
-// @Tags         authentication
-// @Accept       json
-// @Produce      json
-// @Param        input  body      models.UserSignupVerification   true  "Email OTP verification request"
-// @Success      200    {object}  models.SignupCompleteResponse   "Signup completed successfully with tokens"
-// @Failure      400    {object}  models.ErrorResponse            "Invalid signup ID or wrong OTP"
-// @Failure      406    {object}  models.ErrorResponse            "Phone not verified"
-// @Failure      500    {object}  models.ErrorResponse            "Server or database error"
-// @Router       /api/v1/auth/signup/complete [post]
-
+// @Summary Complete signup with email OTP verification
+// @Description Verifies the OTP sent to the user's email during signup, checks phone verification, creates the user in the database, assigns default roles, and returns JWT tokens for login.
+// @Tags Signup
+// @Accept json
+// @Produce json
+// @Param input body models.UserSignupVerification true "Signup verification request including signup session ID and OTP"
+// @Success 200 {object} models.SignupCompleteResponse "Signup completed successfully with ID, user ID, and tokens"
+// @Failure 400 {object} models.ErrorResponse "Invalid signup ID, wrong OTP, or input validation error"
+// @Failure 406 {object} models.ErrorResponse "Phone not verified, cannot complete signup"
+// @Failure 409 {object} models.ErrorResponse "Email or phone already verified / user already exists"
+// @Failure 500 {object} models.ErrorResponse "Server error, Redis error, or database failure"
+// @Router /api/v1/auth/signup/complete [post]
 func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.UserSignupVerification
 	var user *models.UserSignupData
@@ -444,18 +442,17 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 
 // PasswordLoginHandler godoc
 // @Summary      Login with email and password
-// @Description  Authenticates a user using email, password, and userpool. Returns ID, access, and refresh tokens on success.
-// @Tags         authentication
+// @Description  Authenticates a user using email, password, and user pool. Returns ID token, access token, and refresh token on successful login.
+// @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.PasswordLoginRequest  true  "Password login request"
+// @Param        input  body      models.PasswordLoginRequest  true  "Password login request including email, password, and user pool ID"
 // @Success      200    {object}  models.LoginResponse         "Login successful with tokens"
-// @Failure      400    {object}  models.ErrorResponse         "Invalid request body"
+// @Failure      400    {object}  models.ErrorResponse         "Invalid request body or validation error"
 // @Failure      401    {object}  models.ErrorResponse         "Incorrect password"
 // @Failure      404    {object}  models.ErrorResponse         "User not found"
 // @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/auth/login/password [post]
-
 func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.PasswordLoginRequest
 
@@ -520,7 +517,7 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 // LoginOtpRequestHandler godoc
 // @Summary      Request OTP for login
 // @Description  Starts OTP-based login by sending OTP to email or phone (based on method).
-// @Tags         authentication
+// @Tags         Authentication
 // @Accept       json
 // @Produce      json
 // @Param        input  body      models.OtpLoginRequest   true  "Login OTP request"
@@ -529,7 +526,6 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      404    {object}  models.ErrorResponse     "User not found"
 // @Failure      500    {object}  models.ErrorResponse     "Server or database error"
 // @Router       /api/v1/auth/login/otp/request [post]
-
 func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.OtpLoginRequest
 
@@ -614,17 +610,16 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 // LoginOtpVerifyHandler godoc
 // @Summary      Verify OTP for login
-// @Description  Verifies OTP and issues ID, access, and refresh tokens for user login.
-// @Tags         authentication
+// @Description  Verifies the OTP provided by the user for OTP-based login. If valid, generates new ID, access, and refresh tokens, revokes previous refresh tokens, and returns the tokens.
+// @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.OtpLoginVerifyRequest  true  "Login OTP verification request"
-// @Success      200    {object}  models.LoginResponse          "Login successful with tokens"
-// @Failure      400    {object}  models.ErrorResponse          "Invalid input or wrong OTP"
-// @Failure      404    {object}  models.ErrorResponse          "OTP session expired or user not found"
-// @Failure      500    {object}  models.ErrorResponse          "Server or database error"
+// @Param        input  body      models.OtpLoginVerifyRequest  true  "OTP verification request containing cache ID and OTP answer"
+// @Success      200    {object}  models.LoginResponse          "Login successful with new tokens"
+// @Failure      400    {object}  models.ErrorResponse          "Invalid request body, wrong OTP, or validation error"
+// @Failure      404    {object}  models.ErrorResponse          "OTP session not found or expired"
+// @Failure      500    {object}  models.ErrorResponse          "Server, database, or token generation error"
 // @Router       /api/v1/auth/login/otp/verify [post]
-
 func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.OtpLoginVerifyRequest
 
@@ -727,18 +722,17 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 
 // SessionRefreshHandler godoc
 // @Summary      Refresh session tokens
-// @Description  Uses refresh token and ID token to generate new ID and access tokens.
-// @Tags         authentication
+// @Description  Generates new ID and access tokens using a valid refresh token and ID token. Ensures the refresh token is valid and not revoked.
+// @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.RefreshSession   true  "Session refresh request"
-// @Success      200    {object}  map[string]string       "New tokens returned"
-// @Failure      400    {object}  models.ErrorResponse    "Invalid request body"
-// @Failure      401    {object}  models.ErrorResponse    "Invalid or mismatched refresh token"
-// @Failure      404    {object}  models.ErrorResponse    "User not found"
-// @Failure      500    {object}  models.ErrorResponse    "Server or database error"
+// @Param        input  body      models.RefreshSessionRequest  true  "Session refresh request containing ID token and refresh token"
+// @Success      200    {object}  models.RefreshSessionResponse "New ID and access tokens returned"
+// @Failure      400    {object}  models.ErrorResponse         "Invalid request body or validation error"
+// @Failure      401    {object}  models.ErrorResponse         "Invalid or mismatched refresh token"
+// @Failure      404    {object}  models.ErrorResponse         "User not found"
+// @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/auth/session/refresh [post]
-
 func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 	var token models.RefreshSessionRequest
 
@@ -812,17 +806,16 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 // LogoutHandler godoc
 // @Summary      Logout user
-// @Description  Logs out the user by revoking all refresh tokens for the given user.
-// @Tags         authentication
+// @Description  Logs out the user by revoking all refresh tokens associated with their account.
+// @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        input  body      models.LogoutRequest  true  "Logout request"
+// @Param        input  body      models.LogoutRequest  true  "Logout request containing ID token"
 // @Success      200    {object}  map[string]string     "Logout successful"
-// @Failure      400    {object}  models.ErrorResponse  "Invalid request body"
-// @Failure      403    {object}  models.ErrorResponse  "Unable to extract user ID"
-// @Failure      500    {object}  models.ErrorResponse  "Database error"
+// @Failure      400    {object}  models.ErrorResponse  "Invalid request body or validation error"
+// @Failure      403    {object}  models.ErrorResponse  "Unable to extract user ID from token"
+// @Failure      500    {object}  models.ErrorResponse  "Database error while revoking tokens"
 // @Router       /api/v1/auth/logout [post]
-
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.LogoutRequest
 
@@ -865,18 +858,17 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // PasswordResetRequestHandler godoc
-// @Summary      Request password reset
-// @Description  Starts password reset by sending OTP to registered email for the given userpool.
-// @Tags         authentication
-// @Accept       json
-// @Produce      json
-// @Param        input  body      models.PasswordResetRequest   true  "Password reset request"
-// @Success      200    {object}  models.PasswordResetResponse  "OTP sent for password reset"
-// @Failure      400    {object}  models.ErrorResponse          "Invalid request body"
-// @Failure      404    {object}  models.ErrorResponse          "User not found"
-// @Failure      500    {object}  models.ErrorResponse          "Server or database error"
-// @Router       /api/v1/auth/password/request [post]
-
+// @Summary Request password reset OTP
+// @Description Initiates a password reset by generating and sending an OTP to the registered email for the specified userpool.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param input body models.PasswordResetRequest true "Password reset request containing email and userpool"
+// @Success 200 {object} models.PasswordResetResponse "OTP sent successfully for password reset"
+// @Failure 400 {object} models.ErrorResponse "Invalid request body, missing email, or validation error"
+// @Failure 404 {object} models.ErrorResponse "User not found"
+// @Failure 500 {object} models.ErrorResponse "Server or database error"
+// @Router /api/v1/auth/password/request [post]
 func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.PasswordResetRequest
 
@@ -944,18 +936,17 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // PasswordResetCompleteHandler godoc
-// @Summary      Complete password reset
-// @Description  Verifies OTP and resets user password by updating DB record.
-// @Tags         authentication
-// @Accept       json
-// @Produce      json
-// @Param        input  body      models.PasswordResetVerifyRequest  true  "Password reset verification"
-// @Success      200    {object}  map[string]string                  "Password reset successful"
-// @Failure      400    {object}  models.ErrorResponse               "Invalid request body or wrong OTP"
-// @Failure      404    {object}  models.ErrorResponse               "OTP session expired or user not found"
-// @Failure      500    {object}  models.ErrorResponse               "Server or database error"
-// @Router       /api/v1/auth/password/reset [post]
-
+// @Summary Complete password reset
+// @Description Verifies the OTP and resets the user's password by updating the database record.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param input body models.PasswordResetVerifyRequest true "Password reset verification request containing OTP and new password"
+// @Success 200 {object} map[string]string "Password reset successful"
+// @Failure 400 {object} models.ErrorResponse "Invalid request body, wrong OTP, or validation error"
+// @Failure 404 {object} models.ErrorResponse "OTP session expired or user not found"
+// @Failure 500 {object} models.ErrorResponse "Server or database error"
+// @Router /api/v1/auth/password/reset [post]
 func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	var input models.PasswordResetVerifyRequest
 

@@ -23,45 +23,51 @@ var rbacRoutes = []router.Route{
 		},
 	},
 	{
-		Method:  http.MethodPost,
-		Pattern: regexp.MustCompile(`^([^/]+)/roles$`),
+		Method:  http.MethodPatch,
+		Pattern: regexp.MustCompile(`^roles/([^/]+)$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			createRoles(w, r, matches[1])
+			roleID := matches[1]
+			updateRoles(w, r, roleID)
 		},
 	},
 	{
 		Method:  http.MethodPatch,
-		Pattern: regexp.MustCompile(`^update/roles/([^/]+)$`),
+		Pattern: regexp.MustCompile(`^roles/([^/]+)$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			updateRoles(w, r, matches[1])
+			roleID := matches[1]
+			updateRoles(w, r, roleID)
 		},
 	},
 	{
 		Method:  http.MethodDelete,
-		Pattern: regexp.MustCompile(`^update/roles/([^/]+)$`),
+		Pattern: regexp.MustCompile(`^roles/([^/]+)$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			deleteRoles(w, r, matches[1])
+			roleID := matches[1]
+			deleteRoles(w, r, roleID)
 		},
 	},
 	{
 		Method:  http.MethodPost,
-		Pattern: regexp.MustCompile(`^([^/]+)/users/([^/]+)/roles$`),
+		Pattern: regexp.MustCompile(`^pools/([^/]+)/users/([^/]+)/roles$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			assignRole(w, r, matches[1], matches[2])
+			poolID := matches[1]
+			userID := matches[2]
+			assignRole(w, r, poolID, userID)
 		},
 	},
 	{
 		Method:  http.MethodDelete,
-		Pattern: regexp.MustCompile(`^([^/]+)/users/([^/]+)/roles$`),
+		Pattern: regexp.MustCompile(`^pools/([^/]+)/users/([^/]+)/roles$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			removeRole(w, r, matches[1], matches[2])
+			poolID := matches[1]
+			userID := matches[2]
+			removeRole(w, r, poolID, userID)
 		},
 	},
-
 	{
 		Method:  http.MethodGet,
 		Pattern: regexp.MustCompile(`^audit-logs$`),
-		Handler: func(w http.ResponseWriter, r *http.Request, _ []string) {
+		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
 			listAuditLogs(w, r)
 		},
 	},
@@ -74,7 +80,7 @@ func RbacRouter(w http.ResponseWriter, r *http.Request) {
 // GetRolesData godoc
 // @Summary      Retrieve roles for a user pool
 // @Description  Returns all roles in a given user pool. Optionally, filter by user_id.
-// @Tags         rbac
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        pool_id  query     string  true   "User pool ID"
@@ -158,7 +164,7 @@ func getRolesData(w http.ResponseWriter, r *http.Request) {
 // CreateRoles godoc
 // @Summary      Create a new role in a user pool
 // @Description  Creates a new role with permissions in the specified user pool.
-// @Tags         rbac
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string                   true  "Owner API Key"
@@ -167,8 +173,7 @@ func getRolesData(w http.ResponseWriter, r *http.Request) {
 // @Failure      400        {object}  models.ErrorResponse    "Invalid input"
 // @Failure      401        {object}  models.ErrorResponse    "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse    "Server/database error"
-// @Router       /api/v1/rbac/{pool_id}/roles [post]
-
+// @Router       /api/v1/rbac/pools/{pool_id}/roles [post]
 func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 	var input models.CreateRoleRequest
 	var roleId string
@@ -224,7 +229,7 @@ func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 // UpdateRoles godoc
 // @Summary      Update role permissions
 // @Description  Updates the permissions of a role in the user pool.
-// @Tags         rbac
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string                  true  "Owner API Key"
@@ -234,8 +239,7 @@ func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 // @Failure      400        {object}  models.ErrorResponse   "Invalid input"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/update/roles/{roleID} [patch]
-
+// @Router       /api/v1/rbac/roles/{roleID} [patch]
 func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 	var input models.UpdateRoleRequest
 	var roleName string
@@ -290,18 +294,17 @@ func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 
 // DeleteRoles godoc
 // @Summary      Delete a role
-// @Description  Deletes a role from the user pool.
-// @Tags         rbac
+// @Description  Deletes a specific role from the user pool.
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string  true  "Owner API Key"
-// @Param        roleID     path      string  true  "Role ID to delete"
+// @Param        role_id    path      string  true  "ID of the role to delete"
 // @Success      200        {object}  map[string]interface{} "Role deleted successfully"
 // @Failure      400        {object}  models.ErrorResponse   "Missing role ID"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/update/roles/{roleID} [delete]
-
+// @Router       /api/v1/rbac/roles/{role_id} [delete]
 func deleteRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 
 	apiKey := r.Header.Get("X-API-KEY")
@@ -343,20 +346,18 @@ func deleteRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 
 // AssignRole godoc
 // @Summary      Assign a role to a user
-// @Description  Links a role to a specific user in the user pool.
-// @Tags         rbac
+// @Description  Assigns a specific role to a user in the given user pool.
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string  true  "Owner API Key"
-// @Param        poolID     path      string  true  "User pool ID"
-// @Param        userID     path      string  true  "User ID to assign role to"
-// @Param        roleID     path      string  true  "Role ID to assign"
+// @Param        pool_id    path      string  true  "User pool ID"
+// @Param        user_id    path      string  true  "User ID to assign role to"
 // @Success      200        {object}  map[string]interface{} "Role assigned successfully"
 // @Failure      400        {object}  models.ErrorResponse   "Missing userID or roleID"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/{poolID}/users/{userID}/roles [post]
-
+// @Router       /api/v1/rbac/pools/{pool_id}/users/{user_id}/roles [post]
 func assignRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 	var id string
 
@@ -431,20 +432,18 @@ func assignRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 
 // RemoveRole godoc
 // @Summary      Revoke a role from a user
-// @Description  Removes a role assigned to a specific user in the user pool.
-// @Tags         rbac
+// @Description  Removes a role assigned to a specific user in the given user pool.
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string  true  "Owner API Key"
-// @Param        poolID     path      string  true  "User pool ID"
-// @Param        userID     path      string  true  "User ID"
-// @Param        roleID     path      string  true  "Role ID to remove"
+// @Param        pool_id    path      string  true  "User pool ID"
+// @Param        user_id    path      string  true  "User ID"
 // @Success      200        {object}  map[string]interface{} "Role revoked successfully"
 // @Failure      400        {object}  models.ErrorResponse   "Missing userID or roleID"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/{poolID}/users/{userID}/roles [delete]
-
+// @Router       /api/v1/rbac/pools/{pool_id}/users/{user_id}/roles [delete]
 func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 	var id string
 
@@ -519,10 +518,10 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 // ListAuditLogs godoc
 // @Summary      Get audit logs
 // @Description  Returns audit logs for a given user pool. Can filter by actor_id, action, and target_id.
-// @Tags         rbac
+// @Tags         Rbac
 // @Accept       json
 // @Produce      json
-// @Param        pool_id   query     string  true   "User pool ID"
+// @Param        pool_id   path      string  true   "User pool ID"
 // @Param        actor_id  query     string  false  "Filter by actor ID"
 // @Param        action    query     string  false  "Filter by action"
 // @Param        target_id query     string  false  "Filter by target ID"
@@ -530,7 +529,6 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 // @Failure      400       {object}  models.ErrorResponse  "Missing pool_id"
 // @Failure      500       {object}  models.ErrorResponse  "Server/database error"
 // @Router       /api/v1/rbac/audit-logs [get]
-
 func listAuditLogs(w http.ResponseWriter, r *http.Request) {
 	poolID := r.URL.Query().Get("pool_id")
 	if poolID == "" {
