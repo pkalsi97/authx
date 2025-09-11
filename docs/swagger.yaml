@@ -34,6 +34,16 @@ definitions:
       error:
         type: string
     type: object
+  models.RolesRow:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      permissions:
+        additionalProperties: {}
+        type: object
+    type: object
   models.UpdateUserPoolRequest:
     properties:
       name:
@@ -41,7 +51,7 @@ definitions:
         minLength: 3
         type: string
       schema:
-        additionalProperties: true
+        additionalProperties: {}
         type: object
     required:
     - name
@@ -52,7 +62,7 @@ definitions:
       id:
         type: string
     type: object
-host: localhost:8080
+host: localhost:3000
 info:
   contact:
     email: support@swagger.io
@@ -219,6 +229,45 @@ paths:
       summary: Update a user pool
       tags:
       - userpools
+  /api/v1/rbac/roles:
+    get:
+      consumes:
+      - application/json
+      description: Returns all roles in a given user pool. Optionally, filter by user_id.
+      parameters:
+      - description: User pool ID
+        in: query
+        name: pool_id
+        required: true
+        type: string
+      - description: Optional user ID to filter roles assigned to a specific user
+        in: query
+        name: user_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of roles
+          schema:
+            items:
+              $ref: '#/definitions/models.RolesRow'
+            type: array
+        "400":
+          description: Bad request (missing pool_id or invalid params)
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized (missing or invalid API key)
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server/database error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Retrieve roles for a user pool
+      tags:
+      - rbac
 schemes:
 - http
 - https

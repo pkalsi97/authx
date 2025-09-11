@@ -250,6 +250,65 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/v1/rbac/roles": {
+            "get": {
+                "description": "Returns all roles in a given user pool. Optionally, filter by user_id.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Retrieve roles for a user pool",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User pool ID",
+                        "name": "pool_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional user ID to filter roles assigned to a specific user",
+                        "name": "user_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of roles",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.RolesRow"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (missing pool_id or invalid params)",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (missing or invalid API key)",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server/database error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -305,6 +364,21 @@ const docTemplate = `{
                 }
             }
         },
+        "models.RolesRow": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
         "models.UpdateUserPoolRequest": {
             "type": "object",
             "required": [
@@ -319,7 +393,7 @@ const docTemplate = `{
                 },
                 "schema": {
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 }
             }
         },
@@ -337,7 +411,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "localhost:3000",
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
 	Title:            "AuthX API",
