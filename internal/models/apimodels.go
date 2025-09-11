@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -37,8 +36,8 @@ type CreateUserPoolResponse struct {
 }
 
 type UpdateUserPoolRequest struct {
-	Name   string                 `json:"name" validate:"required,min=3,max=50"`
-	Schema map[string]interface{} `json:"schema" validate:"required"`
+	Name   string         `json:"name" validate:"required,min=3,max=50"`
+	Schema map[string]any `json:"schema" validate:"required"`
 }
 
 type UpdateUserPoolResponse struct {
@@ -205,9 +204,9 @@ type CredentialResetCache struct {
 }
 
 type RolesRow struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Permissions json.RawMessage `json:"permissions"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Permissions map[string]any `json:"permissions"`
 }
 
 type CreateRoleRequest struct {
