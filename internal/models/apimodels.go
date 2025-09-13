@@ -217,3 +217,7 @@ type CreateRoleRequest struct {
 type UpdateRoleRequest struct {
 	Scope []string `json:"scope" validate:"required"`
 }
+
+type SuccessResponse struct {
+	Message string `json:"message"`
+}
