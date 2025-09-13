@@ -1,4 +1,3 @@
-basePath: /api/v1
 definitions:
   models.AuditLog:
     properties:
@@ -211,8 +210,9 @@ definitions:
       name:
         type: string
       permissions:
-        additionalProperties: {}
-        type: object
+        items:
+          type: string
+        type: array
     type: object
   models.SignupCompleteResponse:
     properties:
@@ -393,7 +393,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Generate an API key for an owner
       tags:
-      - admins
+      - Admins
   /api/v1/admin/owners/{adminId}/apikeys/{apiKey}/disable:
     patch:
       consumes:
@@ -427,7 +427,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Disable an API key
       tags:
-      - admins
+      - Admins
   /api/v1/admin/owners/create:
     post:
       consumes:
@@ -457,7 +457,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Create an admin
       tags:
-      - admins
+      - Admins
   /api/v1/admin/user-pools/{userpoolId}:
     delete:
       consumes:
@@ -498,7 +498,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Delete a user pool
       tags:
-      - userpools
+      - Userpools
     patch:
       consumes:
       - application/json
@@ -546,7 +546,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Update a user pool
       tags:
-      - userpools
+      - Userpools
   /api/v1/admin/user-pools/create:
     post:
       consumes:
@@ -585,78 +585,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Create a user pool
       tags:
-      - userpools
-  /api/v1/auth/login/otp/request:
-    post:
-      consumes:
-      - application/json
-      description: Starts OTP-based login by sending OTP to email or phone (based
-        on method).
-      parameters:
-      - description: Login OTP request
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/models.OtpLoginRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OTP sent successfully
-          schema:
-            $ref: '#/definitions/models.OtpLoginResponse'
-        "400":
-          description: Invalid request body or method
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: User not found
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Server or database error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      summary: Request OTP for login
-      tags:
-      - Authentication
-  /api/v1/auth/login/otp/verify:
-    post:
-      consumes:
-      - application/json
-      description: Verifies the OTP provided by the user for OTP-based login. If valid,
-        generates new ID, access, and refresh tokens, revokes previous refresh tokens,
-        and returns the tokens.
-      parameters:
-      - description: OTP verification request containing cache ID and OTP answer
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/models.OtpLoginVerifyRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Login successful with new tokens
-          schema:
-            $ref: '#/definitions/models.LoginResponse'
-        "400":
-          description: Invalid request body, wrong OTP, or validation error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "404":
-          description: OTP session not found or expired
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Server, database, or token generation error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      summary: Verify OTP for login
-      tags:
-      - Authentication
+      - Userpools
   /api/v1/auth/login/password:
     post:
       consumes:
@@ -695,6 +624,77 @@ paths:
           schema:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Login with email and password
+      tags:
+      - Authentication
+  /api/v1/auth/login/request:
+    post:
+      consumes:
+      - application/json
+      description: Starts OTP-based login by sending OTP to email or phone (based
+        on method).
+      parameters:
+      - description: Login OTP request
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.OtpLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OTP sent successfully
+          schema:
+            $ref: '#/definitions/models.OtpLoginResponse'
+        "400":
+          description: Invalid request body or method
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server or database error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Request OTP for login
+      tags:
+      - Authentication
+  /api/v1/auth/login/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the OTP provided by the user for OTP-based login. If valid,
+        generates new ID, access, and refresh tokens, revokes previous refresh tokens,
+        and returns the tokens.
+      parameters:
+      - description: OTP verification request containing cache ID and OTP answer
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.OtpLoginVerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful with new tokens
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Invalid request body, wrong OTP, or validation error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: OTP session not found or expired
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server, database, or token generation error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Verify OTP for login
       tags:
       - Authentication
   /api/v1/auth/logout:
@@ -922,37 +922,6 @@ paths:
       summary: Request OTP for email signup
       tags:
       - Signup
-  /api/v1/auth/signup/otp/phone/verify:
-    post:
-      consumes:
-      - application/json
-      description: Verifies the phone OTP and marks the phone as verified in the signup
-        session.
-      parameters:
-      - description: Phone OTP verification request
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/models.UserSignupVerification'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Phone verified successfully
-          schema:
-            $ref: '#/definitions/models.UserSignupResponse'
-        "400":
-          description: Invalid signup ID or wrong OTP
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Server error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      summary: Verify phone signup OTP
-      tags:
-      - Signup
   /api/v1/auth/signup/phone/request:
     post:
       consumes:
@@ -988,6 +957,37 @@ paths:
       summary: Request OTP for phone signup
       tags:
       - Signup
+  /api/v1/auth/signup/phone/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the phone OTP and marks the phone as verified in the signup
+        session.
+      parameters:
+      - description: Phone OTP verification request
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserSignupVerification'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Phone verified successfully
+          schema:
+            $ref: '#/definitions/models.UserSignupResponse'
+        "400":
+          description: Invalid signup ID or wrong OTP
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Verify phone signup OTP
+      tags:
+      - Signup
   /api/v1/rbac/audit-logs:
     get:
       consumes:
@@ -995,6 +995,11 @@ paths:
       description: Returns audit logs for a given user pool. Can filter by actor_id,
         action, and target_id.
       parameters:
+      - description: Owner API Key
+        in: header
+        name: X-API-KEY
+        required: true
+        type: string
       - description: User pool ID
         in: path
         name: pool_id
@@ -1031,7 +1036,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Get audit logs
       tags:
-      - rbac
+      - Rbac
   /api/v1/rbac/pools/{pool_id}/roles:
     post:
       consumes:
@@ -1041,6 +1046,11 @@ paths:
       - description: Owner API Key
         in: header
         name: X-API-KEY
+        required: true
+        type: string
+      - description: User pool ID
+        in: path
+        name: pool_id
         required: true
         type: string
       - description: Role creation request
@@ -1071,100 +1081,18 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Create a new role in a user pool
       tags:
-      - rbac
-  /api/v1/rbac/pools/{pool_id}/users/{user_id}/roles:
-    delete:
-      consumes:
-      - application/json
-      description: Removes a role assigned to a specific user in the given user pool.
-      parameters:
-      - description: Owner API Key
-        in: header
-        name: X-API-KEY
-        required: true
-        type: string
-      - description: User pool ID
-        in: path
-        name: pool_id
-        required: true
-        type: string
-      - description: User ID
-        in: path
-        name: user_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Role revoked successfully
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Missing userID or roleID
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "401":
-          description: Unauthorized (missing/invalid API key)
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Server/database error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      summary: Revoke a role from a user
-      tags:
-      - rbac
-    post:
-      consumes:
-      - application/json
-      description: Assigns a specific role to a user in the given user pool.
-      parameters:
-      - description: Owner API Key
-        in: header
-        name: X-API-KEY
-        required: true
-        type: string
-      - description: User pool ID
-        in: path
-        name: pool_id
-        required: true
-        type: string
-      - description: User ID to assign role to
-        in: path
-        name: user_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Role assigned successfully
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Missing userID or roleID
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "401":
-          description: Unauthorized (missing/invalid API key)
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-        "500":
-          description: Server/database error
-          schema:
-            $ref: '#/definitions/models.ErrorResponse'
-      summary: Assign a role to a user
-      tags:
-      - rbac
+      - Rbac
   /api/v1/rbac/roles:
     get:
       consumes:
       - application/json
       description: Returns all roles in a given user pool. Optionally, filter by user_id.
       parameters:
+      - description: Owner API Key
+        in: header
+        name: X-API-KEY
+        required: true
+        type: string
       - description: User pool ID
         in: query
         name: pool_id
@@ -1197,7 +1125,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Retrieve roles for a user pool
       tags:
-      - rbac
+      - Rbac
   /api/v1/rbac/roles/{role_id}:
     delete:
       consumes:
@@ -1236,7 +1164,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Delete a role
       tags:
-      - rbac
+      - Rbac
   /api/v1/rbac/roles/{roleID}:
     patch:
       consumes:
@@ -1281,7 +1209,94 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Update role permissions
       tags:
-      - rbac
+      - Rbac
+  /api/v1/rbac/users/{user_id}/role/{role_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a role assigned to a specific user.
+      parameters:
+      - description: Owner API Key
+        in: header
+        name: X-API-KEY
+        required: true
+        type: string
+      - description: Role ID
+        in: path
+        name: role_id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role revoked successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing userID or roleID
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized (missing/invalid API key)
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server/database error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Revoke a role from a user
+      tags:
+      - Rbac
+    post:
+      consumes:
+      - application/json
+      description: Assigns a specific role to a user.
+      parameters:
+      - description: Owner API Key
+        in: header
+        name: X-API-KEY
+        required: true
+        type: string
+      - description: Role ID
+        in: path
+        name: role_id
+        required: true
+        type: string
+      - description: User ID to assign role to
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role assigned successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing userID or roleID
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized (missing/invalid API key)
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Server/database error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Assign a role to a user
+      tags:
+      - Rbac
   /api/v1/users/credential/request:
     post:
       consumes:
@@ -1289,6 +1304,16 @@ paths:
       description: Generates and sends an OTP for resetting a user credential (email
         or phone).
       parameters:
+      - description: ID TOKEN
+        in: header
+        name: ID-TOKEN
+        required: true
+        type: string
+      - description: ACCESS TOKEN
+        in: header
+        name: ACCESS-TOKEN
+        required: true
+        type: string
       - description: Credential reset request containing credential type (email/phone)
           and value
         in: body
@@ -1317,7 +1342,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Request OTP for credential reset
       tags:
-      - user-management
+      - User-management
   /api/v1/users/credential/verify:
     post:
       consumes:
@@ -1325,6 +1350,16 @@ paths:
       description: Verifies OTP and updates the requested credential (phone/email)
         for the logged-in user.
       parameters:
+      - description: ID TOKEN
+        in: header
+        name: ID-TOKEN
+        required: true
+        type: string
+      - description: ACCESS TOKEN
+        in: header
+        name: ACCESS-TOKEN
+        required: true
+        type: string
       - description: Credential reset verification request containing OTP and cache
           ID
         in: body
@@ -1359,7 +1394,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Verify OTP for credential reset
       tags:
-      - user-management
+      - User-management
   /api/v1/users/password/reset:
     post:
       consumes:
@@ -1367,6 +1402,16 @@ paths:
       description: Allows a logged-in user to reset their password by verifying the
         old password and setting a new one.
       parameters:
+      - description: ID TOKEN
+        in: header
+        name: ID-TOKEN
+        required: true
+        type: string
+      - description: ACCESS TOKEN
+        in: header
+        name: ACCESS-TOKEN
+        required: true
+        type: string
       - description: Password reset request
         in: body
         name: input
@@ -1400,7 +1445,7 @@ paths:
             $ref: '#/definitions/models.ErrorResponse'
       summary: Reset user password
       tags:
-      - user-management
+      - User-management
 schemes:
 - http
 - https
