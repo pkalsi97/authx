@@ -909,3 +909,44 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	core.CaptureAudit(r.Context(), cache.Userpool, cache.UserID, cache.UserID, core.ActionPasswordChanged, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 	utils.WriteResponse(w, http.StatusOK, map[string]string{"message": "Password Reset"})
 }
+
+// ValidateTokenHandler godoc
+// @Summary Validate access token
+// @Description Introspects an access token to check if it is active. Returns {"active": true} if valid, {"active": false} otherwise.
+// @Tags Authentication
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param token formData string true "Access token to validate"
+// @Success 200 {object} map[string]bool "Token is active or inactive"
+// @Router /api/v1/auth/introspect [post]
+func ValidateToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	accessToken := r.FormValue("token")
+	if accessToken == "" {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	userId, _, err := utils.ExtractInfo(accessToken)
+	if err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), userId)
+	if err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	if err := utils.ValidateAccessToken(accessToken, permissions, roles); err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+	response := map[string]any{"active": true}
+	utils.WriteResponse(w, http.StatusOK, response)
+}
