@@ -16,36 +16,42 @@ import (
 	"github.com/pkalsi97/authx/internal/utils"
 )
 
-// @title           AuthX API
-// @version         1.0
-// @description     Authentication and credential management APIs.
-// @termsOfService  http://swagger.io/terms/
+// @title AuthX API
+// @version 1.0
+// @description Authentication and credential management APIs.
+// @host localhost:3000
+// @BasePath /
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT access token. Format: Bearer {token}
 
-// @contact.name   API Support
-// @contact.url    http://www.swagger.io/support
-// @contact.email  support@swagger.io
-
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host      localhost:3000
-// @BasePath
-// @schemes   http https
 func main() {
 	cfg := config.LoadConfig()
 	port := cfg.Port
 	dbUrl := cfg.DbUrl
 	redisAddr := cfg.RedisAddr
 	redisDb := cfg.RedisDb
-	jwtSecret := cfg.JwtSecret
+	privateKeyPath := cfg.PrivateKeyPath
+	publicKeyPath := cfg.PublicKeyPath
 
-	utils.IntialseTokenGen(jwtSecret)
+	keys, err := config.LoadKeys(privateKeyPath, publicKeyPath)
+	if err != nil {
+		log.Fatalf("Unable to load keys: %v", err)
+	}
+
+	utils.InitialiseTokenGen(keys.Private, keys.Public)
+	if err := utils.InitialiseJWKS(); err != nil {
+		log.Fatalf("Unable to Initialise JWKS: %v", err)
+	}
+
 	utils.InitaliseValidator()
 
 	db.StartDb(dbUrl)
 	db.StartRedis(redisAddr, redisDb)
 
-	mux := server.SetUpRoutes()
+	mux := server.SetUpRoutes(utils.JWKS)
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: core.LoggingMiddleware(mux),
