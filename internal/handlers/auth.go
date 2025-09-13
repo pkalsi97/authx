@@ -912,12 +912,12 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 
 // ValidateTokenHandler godoc
 // @Summary Validate access token
-// @Description Introspects an access token to check if it is active. Returns {"active": true} if valid, {"active": false} otherwise.
+// @Description Introspects an access token to check if it is active. Returns {"active": true} with user info if valid, {"active": false} otherwise.
 // @Tags Authentication
 // @Accept x-www-form-urlencoded
 // @Produce json
 // @Param token formData string true "Access token to validate"
-// @Success 200 {object} map[string]bool "Token is active or inactive"
+// @Success 200 {object} map[string]interface{} "Token introspection result containing active status, user id, userpool, scopes, and roles"
 // @Router /api/v1/auth/introspect [post]
 func ValidateToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -931,7 +931,7 @@ func ValidateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, _, err := utils.ExtractInfo(accessToken)
+	userId, userpool, err := utils.ExtractInfo(accessToken)
 	if err != nil {
 		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
 		return
@@ -947,6 +947,12 @@ func ValidateToken(w http.ResponseWriter, r *http.Request) {
 		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
 		return
 	}
-	response := map[string]any{"active": true}
+	response := map[string]any{
+		"active":   true,
+		"sub":      userId,
+		"userpool": userpool,
+		"scopes":   permissions,
+		"roles":    roles,
+	}
 	utils.WriteResponse(w, http.StatusOK, response)
 }
