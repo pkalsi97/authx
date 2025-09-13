@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   models.AuditLog:
     properties:
@@ -266,6 +267,11 @@ definitions:
       message:
         type: string
     type: object
+  models.SuccessResponse:
+    properties:
+      message:
+        type: string
+    type: object
   models.UpdateRoleRequest:
     properties:
       scope:
@@ -352,15 +358,8 @@ definitions:
     type: object
 host: localhost:3000
 info:
-  contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
+  contact: {}
   description: Authentication and credential management APIs.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  termsOfService: http://swagger.io/terms/
   title: AuthX API
   version: "1.0"
 paths:
@@ -1304,16 +1303,6 @@ paths:
       description: Generates and sends an OTP for resetting a user credential (email
         or phone).
       parameters:
-      - description: ID TOKEN
-        in: header
-        name: ID-TOKEN
-        required: true
-        type: string
-      - description: ACCESS TOKEN
-        in: header
-        name: ACCESS-TOKEN
-        required: true
-        type: string
       - description: Credential reset request containing credential type (email/phone)
           and value
         in: body
@@ -1340,6 +1329,8 @@ paths:
           description: Server or database error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Request OTP for credential reset
       tags:
       - User-management
@@ -1350,16 +1341,6 @@ paths:
       description: Verifies OTP and updates the requested credential (phone/email)
         for the logged-in user.
       parameters:
-      - description: ID TOKEN
-        in: header
-        name: ID-TOKEN
-        required: true
-        type: string
-      - description: ACCESS TOKEN
-        in: header
-        name: ACCESS-TOKEN
-        required: true
-        type: string
       - description: Credential reset verification request containing OTP and cache
           ID
         in: body
@@ -1392,6 +1373,8 @@ paths:
           description: Server or database error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Verify OTP for credential reset
       tags:
       - User-management
@@ -1402,16 +1385,6 @@ paths:
       description: Allows a logged-in user to reset their password by verifying the
         old password and setting a new one.
       parameters:
-      - description: ID TOKEN
-        in: header
-        name: ID-TOKEN
-        required: true
-        type: string
-      - description: ACCESS TOKEN
-        in: header
-        name: ACCESS-TOKEN
-        required: true
-        type: string
       - description: Password reset request
         in: body
         name: input
@@ -1424,9 +1397,7 @@ paths:
         "200":
           description: Password Reset Successful
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Invalid request body or validation error
           schema:
@@ -1443,10 +1414,18 @@ paths:
           description: Server or database error
           schema:
             $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Reset user password
       tags:
       - User-management
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT access token. Format: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

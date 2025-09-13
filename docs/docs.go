@@ -9,16 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -1404,6 +1395,11 @@ const docTemplate = `{
         },
         "/api/v1/users/credential/request": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Generates and sends an OTP for resetting a user credential (email or phone).",
                 "consumes": [
                     "application/json"
@@ -1416,20 +1412,6 @@ const docTemplate = `{
                 ],
                 "summary": "Request OTP for credential reset",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID TOKEN",
-                        "name": "ID-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ACCESS TOKEN",
-                        "name": "ACCESS-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Credential reset request containing credential type (email/phone) and value",
                         "name": "input",
@@ -1470,6 +1452,11 @@ const docTemplate = `{
         },
         "/api/v1/users/credential/verify": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Verifies OTP and updates the requested credential (phone/email) for the logged-in user.",
                 "consumes": [
                     "application/json"
@@ -1482,20 +1469,6 @@ const docTemplate = `{
                 ],
                 "summary": "Verify OTP for credential reset",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID TOKEN",
-                        "name": "ID-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ACCESS TOKEN",
-                        "name": "ACCESS-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Credential reset verification request containing OTP and cache ID",
                         "name": "input",
@@ -1545,6 +1518,11 @@ const docTemplate = `{
         },
         "/api/v1/users/password/reset": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Allows a logged-in user to reset their password by verifying the old password and setting a new one.",
                 "consumes": [
                     "application/json"
@@ -1557,20 +1535,6 @@ const docTemplate = `{
                 ],
                 "summary": "Reset user password",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID TOKEN",
-                        "name": "ID-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ACCESS TOKEN",
-                        "name": "ACCESS-TOKEN",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Password reset request",
                         "name": "input",
@@ -1585,10 +1549,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Password Reset Successful",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
@@ -2023,6 +1984,14 @@ const docTemplate = `{
                 }
             }
         },
+        "models.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "models.UpdateRoleRequest": {
             "type": "object",
             "required": [
@@ -2149,6 +2118,14 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "JWT access token. Format: Bearer {token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
@@ -2156,7 +2133,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:3000",
-	BasePath:         "",
+	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "AuthX API",
 	Description:      "Authentication and credential management APIs.",
