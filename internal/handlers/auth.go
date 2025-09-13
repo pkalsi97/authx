@@ -436,6 +436,32 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	query = `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
+	_, err = db.GetDb().Exec(r.Context(), query, id)
+	if err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+		return
+	}
+
+	hashedToken, err := utils.CreateHash(tokens.RefreshToken)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
+		return
+	}
+	log.Print(hashedToken)
+
+	var tokenID string
+	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
+			VALUES($1,$2,$3)
+			RETURNING id`
+	args = []any{id, hashedToken, time.Now().Add(365 * time.Minute)}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+		return
+	}
+
 	core.CaptureAudit(r.Context(), input.Userpool, id, id, core.ActionUserLogin, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	response := &models.LoginResponse{
@@ -588,10 +614,11 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `DELETE FROM refresh_tokens WHERE user_id=$1`
+	query := `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
 	_, err = db.GetDb().Exec(r.Context(), query, cache.UserId)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -651,7 +678,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	userId, userpool, err := utils.ExtractUserIDFromIDToken(token.Idtoken)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", "")
+		utils.WriteError(w, http.StatusInternalServerError, "Session Refresh Failed", err.Error())
 		return
 	}
 
@@ -663,9 +690,10 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
-
+	log.Print(tokenHash)
+	log.Print(token.Refreshtoken)
 	if !utils.CompareHash(tokenHash, token.Refreshtoken) {
-		utils.WriteError(w, http.StatusUnauthorized, "Incorrect Password", "Plase enter the correct password")
+		utils.WriteError(w, http.StatusUnauthorized, "Session Refresh Failed", "Please Provide Correct Refresh Token")
 		return
 	}
 
@@ -725,12 +753,14 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `DELETE FROM refresh_tokens WHERE user_id=$1`
+	query := `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
 	_, err = db.GetDb().Exec(r.Context(), query, userId)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
+
 	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserLogout, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	w.Header().Set("Content-Type", "application/json")
