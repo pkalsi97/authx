@@ -204,9 +204,9 @@ type CredentialResetCache struct {
 }
 
 type RolesRow struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Permissions map[string]any `json:"permissions"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
 }
 
 type CreateRoleRequest struct {
