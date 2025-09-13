@@ -14,6 +14,13 @@ import (
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/server"
 	"github.com/pkalsi97/authx/internal/utils"
+
+	"net"
+
+	"github.com/pkalsi97/authx/internal/handlers"
+	pb "github.com/pkalsi97/authx/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 // @title AuthX API
@@ -67,11 +74,29 @@ func main() {
 		}
 	}()
 
+	grpcLis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen on gRPC port: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterAuthServiceServer(grpcServer, &handlers.AuthServer{})
+	reflection.Register(grpcServer)
+	go func() {
+		log.Println("gRPC server running on :50051")
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Fatalf("gRPC server failed: %v", err)
+		}
+	}()
+
 	sig := <-sigChan
 	log.Printf("Shutdown signal received: %s", sig.String())
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	grpcServer.GracefulStop()
+	log.Println("gRPC server exited gracefully")
 
 	if err := server.Shutdown(ctxShutdown); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
