@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
 	"unicode"
 
@@ -13,8 +16,42 @@ func InitaliseValidator() {
 	Validate = validator.New()
 }
 
-func ValidateInput(input interface{}) error {
+func ValidateInput(input any) error {
 	return Validate.Struct(input)
+}
+
+func CheckHeaders(r *http.Request, headers []string) error {
+	missing := []string{}
+
+	for _, h := range headers {
+		if r.Header.Get(h) == "" {
+			missing = append(missing, h)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required headers: %v", missing)
+	}
+	return nil
+}
+
+func BindAndValidate[T any](r *http.Request, method string) (*T, error) {
+
+	if r.Method != method {
+		return nil, fmt.Errorf("invalid request method: got %s, want %s", r.Method, method)
+	}
+	defer r.Body.Close()
+
+	var input T
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		return nil, fmt.Errorf("decode error: %w", err)
+	}
+
+	if err := ValidateInput(&input); err != nil {
+		return nil, fmt.Errorf("validation error: %w", err)
+	}
+
+	return &input, nil
 }
 
 func IsValidPhone(phone string) (string, bool) {
