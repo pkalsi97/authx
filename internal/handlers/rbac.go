@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkalsi97/authx/internal/core"
@@ -23,11 +24,10 @@ var rbacRoutes = []router.Route{
 		},
 	},
 	{
-		Method:  http.MethodPatch,
-		Pattern: regexp.MustCompile(`^roles/([^/]+)$`),
+		Method:  http.MethodPost,
+		Pattern: regexp.MustCompile(`^pools/([^/]+)/roles$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			roleID := matches[1]
-			updateRoles(w, r, roleID)
+			createRoles(w, r, matches[1])
 		},
 	},
 	{
@@ -48,20 +48,20 @@ var rbacRoutes = []router.Route{
 	},
 	{
 		Method:  http.MethodPost,
-		Pattern: regexp.MustCompile(`^pools/([^/]+)/users/([^/]+)/roles$`),
+		Pattern: regexp.MustCompile(`^users/([^/]+)/role/([^/]+)$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			poolID := matches[1]
-			userID := matches[2]
-			assignRole(w, r, poolID, userID)
+			userID := matches[1]
+			roleID := matches[2]
+			assignRole(w, r, userID, roleID)
 		},
 	},
 	{
 		Method:  http.MethodDelete,
-		Pattern: regexp.MustCompile(`^pools/([^/]+)/users/([^/]+)/roles$`),
+		Pattern: regexp.MustCompile(`^users/([^/]+)/role/([^/]+)$`),
 		Handler: func(w http.ResponseWriter, r *http.Request, matches []string) {
-			poolID := matches[1]
-			userID := matches[2]
-			removeRole(w, r, poolID, userID)
+			userID := matches[1]
+			roleID := matches[2]
+			removeRole(w, r, userID, roleID)
 		},
 	},
 	{
@@ -83,6 +83,7 @@ func RbacRouter(w http.ResponseWriter, r *http.Request) {
 // @Tags         Rbac
 // @Accept       json
 // @Produce      json
+// @Param        X-API-KEY  header    string                   true  "Owner API Key"
 // @Param        pool_id  query     string  true   "User pool ID"
 // @Param        user_id  query     string  false  "Optional user ID to filter roles assigned to a specific user"
 // @Success      200      {array}   models.RolesRow   "List of roles"
@@ -91,11 +92,14 @@ func RbacRouter(w http.ResponseWriter, r *http.Request) {
 // @Failure      500      {object}  models.ErrorResponse "Server/database error"
 // @Router       /api/v1/rbac/roles [get]
 func getRolesData(w http.ResponseWriter, r *http.Request) {
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -156,9 +160,7 @@ func getRolesData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(roles)
+	utils.WriteResponse(w, http.StatusOK, roles)
 }
 
 // CreateRoles godoc
@@ -168,6 +170,7 @@ func getRolesData(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string                   true  "Owner API Key"
+// @Param        pool_id  path     string  true   "User pool ID"
 // @Param        input      body      models.CreateRoleRequest  true  "Role creation request"
 // @Success      200        {object}  map[string]interface{}   "Role created successfully"
 // @Failure      400        {object}  models.ErrorResponse    "Invalid input"
@@ -175,14 +178,15 @@ func getRolesData(w http.ResponseWriter, r *http.Request) {
 // @Failure      500        {object}  models.ErrorResponse    "Server/database error"
 // @Router       /api/v1/rbac/pools/{pool_id}/roles [post]
 func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
-	var input models.CreateRoleRequest
 	var roleId string
 
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -192,13 +196,9 @@ func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid request", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid request", err.Error())
+	input, err := utils.BindAndValidate[models.CreateRoleRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -221,9 +221,7 @@ func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 		"message": "Success",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // UpdateRoles godoc
@@ -241,14 +239,15 @@ func createRoles(w http.ResponseWriter, r *http.Request, poolID string) {
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
 // @Router       /api/v1/rbac/roles/{roleID} [patch]
 func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
-	var input models.UpdateRoleRequest
 	var roleName string
 
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -258,13 +257,9 @@ func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid request", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid request", err.Error())
+	input, err := utils.BindAndValidate[models.UpdateRoleRequest](r, http.MethodPatch)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -287,9 +282,7 @@ func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 		"message":   "Success",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // DeleteRoles godoc
@@ -306,12 +299,12 @@ func updateRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
 // @Router       /api/v1/rbac/roles/{role_id} [delete]
 func deleteRoles(w http.ResponseWriter, r *http.Request, roleID string) {
-
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -335,37 +328,33 @@ func deleteRoles(w http.ResponseWriter, r *http.Request, roleID string) {
 		return
 	}
 
-	response := map[string]any{
-		"message": "Success",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, map[string]any{"message": "Success"})
 }
 
 // AssignRole godoc
 // @Summary      Assign a role to a user
-// @Description  Assigns a specific role to a user in the given user pool.
+// @Description  Assigns a specific role to a user.
 // @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string  true  "Owner API Key"
-// @Param        pool_id    path      string  true  "User pool ID"
+// @Param        role_id    path      string  true  "Role ID"
 // @Param        user_id    path      string  true  "User ID to assign role to"
 // @Success      200        {object}  map[string]interface{} "Role assigned successfully"
 // @Failure      400        {object}  models.ErrorResponse   "Missing userID or roleID"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/pools/{pool_id}/users/{user_id}/roles [post]
+// @Router       /api/v1/rbac/users/{user_id}/role/{role_id} [POST]
 func assignRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 	var id string
 
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerID string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -380,6 +369,8 @@ func assignRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 		return
 	}
 
+	userID = strings.TrimSpace(userID)
+	ownerID = strings.TrimSpace(ownerID)
 	var exists bool
 	query = `
         SELECT EXISTS (
@@ -425,33 +416,34 @@ func assignRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 		"message": "Success",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // RemoveRole godoc
 // @Summary      Revoke a role from a user
-// @Description  Removes a role assigned to a specific user in the given user pool.
+// @Description  Removes a role assigned to a specific user.
 // @Tags         Rbac
 // @Accept       json
 // @Produce      json
 // @Param        X-API-KEY  header    string  true  "Owner API Key"
-// @Param        pool_id    path      string  true  "User pool ID"
+// @Param        role_id    path      string  true  "Role ID"
 // @Param        user_id    path      string  true  "User ID"
 // @Success      200        {object}  map[string]interface{} "Role revoked successfully"
 // @Failure      400        {object}  models.ErrorResponse   "Missing userID or roleID"
 // @Failure      401        {object}  models.ErrorResponse   "Unauthorized (missing/invalid API key)"
 // @Failure      500        {object}  models.ErrorResponse   "Server/database error"
-// @Router       /api/v1/rbac/pools/{pool_id}/users/{user_id}/roles [delete]
+// @Router       /api/v1/rbac/users/{user_id}/role/{role_id} [DELETE]
 func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
+
 	var id string
 
-	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -465,6 +457,9 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 		utils.WriteError(w, http.StatusBadRequest, "Missing path Param", "UserID/RoleID Not entered")
 		return
 	}
+
+	userID = strings.TrimSpace(userID)
+	ownerId = strings.TrimSpace(ownerId)
 
 	var exists bool
 	query = `
@@ -510,9 +505,7 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 	}
 	core.CaptureAudit(r.Context(), userpoolId, userID, userID, core.ActionRoleRevoked, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // ListAuditLogs godoc
@@ -521,6 +514,7 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 // @Tags         Rbac
 // @Accept       json
 // @Produce      json
+// @Param        X-API-KEY  header    string  true  "Owner API Key"
 // @Param        pool_id   path      string  true   "User pool ID"
 // @Param        actor_id  query     string  false  "Filter by actor ID"
 // @Param        action    query     string  false  "Filter by action"
@@ -530,6 +524,23 @@ func removeRole(w http.ResponseWriter, r *http.Request, userID, roleID string) {
 // @Failure      500       {object}  models.ErrorResponse  "Server/database error"
 // @Router       /api/v1/rbac/audit-logs [get]
 func listAuditLogs(w http.ResponseWriter, r *http.Request) {
+
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+		return
+	}
+
+	apiKey := r.Header.Get("X-API-KEY")
+
+	var ownerId string
+	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
+	args := []any{apiKey}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &ownerId); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusUnauthorized, "Invalid API Key", resp.Message)
+		return
+	}
+
 	poolID := r.URL.Query().Get("pool_id")
 	if poolID == "" {
 		http.Error(w, "pool_id is required", http.StatusBadRequest)
@@ -540,8 +551,8 @@ func listAuditLogs(w http.ResponseWriter, r *http.Request) {
 	action := r.URL.Query().Get("action")
 	targetID := r.URL.Query().Get("target_id")
 
-	query := "SELECT id, user_pool_id, actor_id, action, target_id, metadata, created_at FROM audit_logs WHERE user_pool_id = $1"
-	args := []interface{}{poolID}
+	query = "SELECT id, user_pool_id, actor_id, action, target_id, metadata, created_at FROM audit_logs WHERE user_pool_id = $1"
+	args = []interface{}{poolID}
 	argIndex := 2
 
 	if actorID != "" {
@@ -590,6 +601,5 @@ func listAuditLogs(w http.ResponseWriter, r *http.Request) {
 		logs = append(logs, log)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(logs)
+	utils.WriteResponse(w, http.StatusOK, logs)
 }
