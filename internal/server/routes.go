@@ -3,19 +3,21 @@ package server
 import (
 	"net/http"
 
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	_ "github.com/pkalsi97/authx/docs"
 	"github.com/pkalsi97/authx/internal/handlers"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-func SetUpRoutes() *http.ServeMux {
+func SetUpRoutes(jwks jwk.Set) *http.ServeMux {
 	mux := http.NewServeMux()
 	registerAdminRoutes(mux)
 	registerRbacRoutes(mux)
 	registerAuthRoutes(mux)
 	registerUserRoutes(mux)
-	// Swagger UI
+
 	mux.Handle("/api/v1/docs/", httpSwagger.WrapHandler)
+	mux.Handle("/.well-known/jwks.json", handlers.JWKSHandler(jwks))
 
 	return mux
 }
