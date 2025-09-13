@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package authx;
+
+option go_package = "github.com/pkalsi97/authx/proto;proto";
+
+service AuthService {
+  rpc IntrospectToken(IntrospectRequest) returns (IntrospectResponse);
+}
+
+message IntrospectRequest {
+  string token = 1; // Access token to validate
+}
+
+message IntrospectResponse {
+  bool active = 1;
+  string sub = 2;
+  string userpool = 3;
+  repeated string scopes = 4;
+  repeated string roles = 5;
+}
