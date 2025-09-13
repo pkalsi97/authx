@@ -347,7 +347,7 @@ const docTemplate = `{
         },
         "/api/v1/auth/introspect": {
             "post": {
-                "description": "Introspects an access token to check if it is active. Returns {\"active\": true} if valid, {\"active\": false} otherwise.",
+                "description": "Introspects an access token to check if it is active. Returns {\"active\": true} with user info if valid, {\"active\": false} otherwise.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -369,12 +369,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Token is active or inactive",
+                        "description": "Token introspection result containing active status, user id, userpool, scopes, and roles",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": {
-                                "type": "boolean"
-                            }
+                            "additionalProperties": true
                         }
                     }
                 }

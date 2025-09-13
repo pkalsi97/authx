@@ -590,7 +590,7 @@ paths:
       consumes:
       - application/x-www-form-urlencoded
       description: 'Introspects an access token to check if it is active. Returns
-        {"active": true} if valid, {"active": false} otherwise.'
+        {"active": true} with user info if valid, {"active": false} otherwise.'
       parameters:
       - description: Access token to validate
         in: formData
@@ -601,10 +601,10 @@ paths:
       - application/json
       responses:
         "200":
-          description: Token is active or inactive
+          description: Token introspection result containing active status, user id,
+            userpool, scopes, and roles
           schema:
-            additionalProperties:
-              type: boolean
+            additionalProperties: true
             type: object
       summary: Validate access token
       tags:
