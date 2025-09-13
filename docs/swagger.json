@@ -343,6 +343,41 @@
                 }
             }
         },
+        "/api/v1/auth/introspect": {
+            "post": {
+                "description": "Introspects an access token to check if it is active. Returns {\"active\": true} if valid, {\"active\": false} otherwise.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Validate access token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Access token to validate",
+                        "name": "token",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token is active or inactive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/login/password": {
             "post": {
                 "description": "Authenticates a user using email, password, and user pool. Returns ID token, access token, and refresh token on successful login.",

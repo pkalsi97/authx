@@ -585,6 +585,30 @@ paths:
       summary: Create a user pool
       tags:
       - Userpools
+  /api/v1/auth/introspect:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: 'Introspects an access token to check if it is active. Returns
+        {"active": true} if valid, {"active": false} otherwise.'
+      parameters:
+      - description: Access token to validate
+        in: formData
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token is active or inactive
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: Validate access token
+      tags:
+      - Authentication
   /api/v1/auth/login/password:
     post:
       consumes:
