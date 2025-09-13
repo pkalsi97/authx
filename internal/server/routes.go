@@ -64,6 +64,7 @@ func registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/signup/complete", handlers.SignupVerifyAndCompleteHandler)
 	mux.HandleFunc("/api/v1/auth/password/request", handlers.PasswordResetRequestHandler)
 	mux.HandleFunc("/api/v1/auth/password/reset", handlers.PasswordResetCompleteHandler)
+	mux.HandleFunc("/api/v1/auth/introspect", handlers.ValidateToken)
 }
 
 /*
