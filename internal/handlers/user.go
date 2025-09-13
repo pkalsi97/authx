@@ -18,22 +18,20 @@ import (
 // @Tags         User-management
 // @Accept       json
 // @Produce      json
-// @Param        ID-TOKEN   header    string                      true  "ID TOKEN"
-// @Param        ACCESS-TOKEN   header    string                      true  "ACCESS TOKEN"
 // @Param        input  body      models.UserPasswordResetRequest  true  "Password reset request"
-// @Success      200    {object}  map[string]string               "Password Reset Successful"
-// @Failure      400    {object}  models.ErrorResponse            "Invalid request body or validation error"
-// @Failure      401    {object}  models.ErrorResponse            "Unauthorized or incorrect current password"
-// @Failure      404    {object}  models.ErrorResponse            "User not found"
-// @Failure      500    {object}  models.ErrorResponse            "Server or database error"
+// @Success      200    {object}  models.SuccessResponse         "Password Reset Successful"
+// @Failure      400    {object}  models.ErrorResponse           "Invalid request body or validation error"
+// @Failure      401    {object}  models.ErrorResponse           "Unauthorized or incorrect current password"
+// @Failure      404    {object}  models.ErrorResponse           "User not found"
+// @Failure      500    {object}  models.ErrorResponse           "Server or database error"
 // @Router       /api/v1/users/password/reset [post]
+// @Security     BearerAuth
 func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
-	if err := utils.CheckHeaders(r, []string{"ID-TOKEN", "ACCESS-TOKEN"}); err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+	accessToken, err := utils.ExtractBearerToken(r)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
-
-	idToken, accessToken := r.Header.Get("ID-TOKEN"), r.Header.Get("ACCESS-TOKEN")
 
 	input, err := utils.BindAndValidate[models.UserPasswordResetRequest](r, http.MethodPost)
 	if err != nil {
@@ -41,7 +39,7 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractInfo(accessToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
@@ -87,7 +85,11 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionPasswordChanged, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
-	utils.WriteResponse(w, http.StatusOK, map[string]string{"message": "Password Reset Successful"})
+	resp := models.SuccessResponse{
+		Message: "Password Reset Successful",
+	}
+
+	utils.WriteResponse(w, http.StatusOK, resp)
 }
 
 // CredentialRequestHandler godoc
@@ -96,23 +98,21 @@ func UserPasswordResetHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         User-management
 // @Accept       json
 // @Produce      json
-// @Param        ID-TOKEN   header    string                      true  "ID TOKEN"
-// @Param        ACCESS-TOKEN   header    string                      true  "ACCESS TOKEN"
 // @Param        input  body      models.UserCredentialRequest  true  "Credential reset request containing credential type (email/phone) and value"
 // @Success      200    {object}  models.UserCredentialResponse "OTP sent successfully with cache ID"
 // @Failure      400    {object}  models.ErrorResponse         "Invalid request body or validation error"
 // @Failure      401    {object}  models.ErrorResponse         "Unauthorized (missing/invalid ID-TOKEN or ACCESS-TOKEN)"
 // @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/users/credential/request [post]
+// @Security     BearerAuth
 func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 	var response models.UserCredentialResponse
 
-	if err := utils.CheckHeaders(r, []string{"ID-TOKEN", "ACCESS-TOKEN"}); err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+	accessToken, err := utils.ExtractBearerToken(r)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
-
-	idToken, accessToken := r.Header.Get("ID-TOKEN"), r.Header.Get("ACCESS-TOKEN")
 
 	input, err := utils.BindAndValidate[models.UserCredentialRequest](r, http.MethodPost)
 	if err != nil {
@@ -120,7 +120,7 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractInfo(accessToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
@@ -176,8 +176,6 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags         User-management
 // @Accept       json
 // @Produce      json
-// @Param        ID-TOKEN   header    string                      true  "ID TOKEN"
-// @Param        ACCESS-TOKEN   header    string                      true  "ACCESS TOKEN"
 // @Param        input  body      models.UserCredentialVerifyRequest  true  "Credential reset verification request containing OTP and cache ID"
 // @Success      200    {object}  map[string]string                   "Credential Reset Successful"
 // @Failure      400    {object}  models.ErrorResponse                "Invalid request body, wrong OTP, or validation error"
@@ -185,14 +183,14 @@ func CredentialRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      404    {object}  models.ErrorResponse                "OTP session not found or expired"
 // @Failure      500    {object}  models.ErrorResponse                "Server or database error"
 // @Router       /api/v1/users/credential/verify [post]
+// @Security     BearerAuth
 func CredentialVerifyHandler(w http.ResponseWriter, r *http.Request) {
 
-	if err := utils.CheckHeaders(r, []string{"ID-TOKEN", "ACCESS-TOKEN"}); err != nil {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+	accessToken, err := utils.ExtractBearerToken(r)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
-
-	idToken, accessToken := r.Header.Get("ID-TOKEN"), r.Header.Get("ACCESS-TOKEN")
 
 	input, err := utils.BindAndValidate[models.UserCredentialVerifyRequest](r, http.MethodPost)
 	if err != nil {
@@ -200,7 +198,7 @@ func CredentialVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, userpool, err := utils.ExtractUserIDFromIDToken(idToken)
+	userId, userpool, err := utils.ExtractInfo(accessToken)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Password Reset Request Failed", err.Error())
 		return
