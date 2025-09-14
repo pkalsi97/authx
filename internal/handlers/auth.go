@@ -449,7 +449,6 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
 		return
 	}
-	log.Print(hashedToken)
 
 	var tokenID string
 	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
@@ -690,8 +689,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
-	log.Print(tokenHash)
-	log.Print(token.Refreshtoken)
+
 	if !utils.CompareHash(tokenHash, token.Refreshtoken) {
 		utils.WriteError(w, http.StatusUnauthorized, "Session Refresh Failed", "Please Provide Correct Refresh Token")
 		return
