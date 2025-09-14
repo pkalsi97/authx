@@ -17,7 +17,7 @@ services:
           memory: 512M
         reservations:
           memory: 512M
-    command: ["make", "all"]
+    command: ["make", "prod"]
 
   postgres:
     image: postgres:15
