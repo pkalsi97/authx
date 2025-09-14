@@ -48,6 +48,8 @@ func main() {
 		log.Fatalf("Unable to load keys: %v", err)
 	}
 
+	core.RunMigrations(dbUrl)
+
 	utils.InitialiseTokenGen(keys.Private, keys.Public)
 	if err := utils.InitialiseJWKS(); err != nil {
 		log.Fatalf("Unable to Initialise JWKS: %v", err)
