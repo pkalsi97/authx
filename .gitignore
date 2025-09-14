@@ -1,5 +1,7 @@
 notes
 .env
+.env.docker
 .DS_Store
 private.pem
 public.pem
+/keys
