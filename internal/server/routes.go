@@ -3,19 +3,21 @@ package server
 import (
 	"net/http"
 
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	_ "github.com/pkalsi97/authx/docs"
 	"github.com/pkalsi97/authx/internal/handlers"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-func SetUpRoutes() *http.ServeMux {
+func SetUpRoutes(jwks jwk.Set) *http.ServeMux {
 	mux := http.NewServeMux()
 	registerAdminRoutes(mux)
 	registerRbacRoutes(mux)
 	registerAuthRoutes(mux)
 	registerUserRoutes(mux)
-	// Swagger UI
+
 	mux.Handle("/api/v1/docs/", httpSwagger.WrapHandler)
+	mux.Handle("/.well-known/jwks.json", handlers.JWKSHandler(jwks))
 
 	return mux
 }
@@ -56,12 +58,13 @@ func registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/login/verify", handlers.LoginOtpVerifyHandler)
 	mux.HandleFunc("/api/v1/auth/session/refresh", handlers.SessionRefreshHandler)
 	mux.HandleFunc("/api/v1/auth/logout", handlers.LogoutHandler)
-	mux.HandleFunc("/api/v1/auth/signup/otp/phone/request", handlers.SignupPhoneOtpRequestHandler)
-	mux.HandleFunc("/api/v1/auth/signup/otp/phone/verify", handlers.SignupPhoneOtpVerifyHandler)
-	mux.HandleFunc("/api/v1/auth/signup/otp/email/request", handlers.SignupEmailOtpRequestHandler)
+	mux.HandleFunc("/api/v1/auth/signup/phone/request", handlers.SignupPhoneOtpRequestHandler)
+	mux.HandleFunc("/api/v1/auth/signup/phone/verify", handlers.SignupPhoneOtpVerifyHandler)
+	mux.HandleFunc("/api/v1/auth/signup/email/request", handlers.SignupEmailOtpRequestHandler)
 	mux.HandleFunc("/api/v1/auth/signup/complete", handlers.SignupVerifyAndCompleteHandler)
 	mux.HandleFunc("/api/v1/auth/password/request", handlers.PasswordResetRequestHandler)
 	mux.HandleFunc("/api/v1/auth/password/reset", handlers.PasswordResetCompleteHandler)
+	mux.HandleFunc("/api/v1/auth/introspect", handlers.ValidateToken)
 }
 
 /*

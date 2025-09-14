@@ -9,16 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -34,7 +25,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admins"
+                    "Admins"
                 ],
                 "summary": "Create an admin",
                 "parameters": [
@@ -80,7 +71,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admins"
+                    "Admins"
                 ],
                 "summary": "Generate an API key for an owner",
                 "parameters": [
@@ -124,7 +115,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "admins"
+                    "Admins"
                 ],
                 "summary": "Disable an API key",
                 "parameters": [
@@ -175,7 +166,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "userpools"
+                    "Userpools"
                 ],
                 "summary": "Create a user pool",
                 "parameters": [
@@ -234,7 +225,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "userpools"
+                    "Userpools"
                 ],
                 "summary": "Delete a user pool",
                 "parameters": [
@@ -292,7 +283,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "userpools"
+                    "Userpools"
                 ],
                 "summary": "Update a user pool",
                 "parameters": [
@@ -354,11 +345,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/login/otp/request": {
+        "/api/v1/auth/introspect": {
             "post": {
-                "description": "Starts OTP-based login by sending OTP to email or phone (based on method).",
+                "description": "Introspects an access token to check if it is active. Returns {\"active\": true} with user info if valid, {\"active\": false} otherwise.",
                 "consumes": [
-                    "application/json"
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -366,93 +357,22 @@ const docTemplate = `{
                 "tags": [
                     "Authentication"
                 ],
-                "summary": "Request OTP for login",
+                "summary": "Validate access token",
                 "parameters": [
                     {
-                        "description": "Login OTP request",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.OtpLoginRequest"
-                        }
+                        "type": "string",
+                        "description": "Access token to validate",
+                        "name": "token",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OTP sent successfully",
+                        "description": "Token introspection result containing active status, user id, userpool, scopes, and roles",
                         "schema": {
-                            "$ref": "#/definitions/models.OtpLoginResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body or method",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Server or database error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/auth/login/otp/verify": {
-            "post": {
-                "description": "Verifies the OTP provided by the user for OTP-based login. If valid, generates new ID, access, and refresh tokens, revokes previous refresh tokens, and returns the tokens.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Authentication"
-                ],
-                "summary": "Verify OTP for login",
-                "parameters": [
-                    {
-                        "description": "OTP verification request containing cache ID and OTP answer",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.OtpLoginVerifyRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Login successful with new tokens",
-                        "schema": {
-                            "$ref": "#/definitions/models.LoginResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body, wrong OTP, or validation error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "OTP session not found or expired",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Server, database, or token generation error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -509,6 +429,110 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Server or database error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/login/request": {
+            "post": {
+                "description": "Starts OTP-based login by sending OTP to email or phone (based on method).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Request OTP for login",
+                "parameters": [
+                    {
+                        "description": "Login OTP request",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OtpLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OTP sent successfully",
+                        "schema": {
+                            "$ref": "#/definitions/models.OtpLoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or method",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server or database error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/login/verify": {
+            "post": {
+                "description": "Verifies the OTP provided by the user for OTP-based login. If valid, generates new ID, access, and refresh tokens, revokes previous refresh tokens, and returns the tokens.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify OTP for login",
+                "parameters": [
+                    {
+                        "description": "OTP verification request containing cache ID and OTP answer",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OtpLoginVerifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful with new tokens",
+                        "schema": {
+                            "$ref": "#/definitions/models.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, wrong OTP, or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "OTP session not found or expired",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server, database, or token generation error",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -846,52 +870,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/signup/otp/phone/verify": {
-            "post": {
-                "description": "Verifies the phone OTP and marks the phone as verified in the signup session.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signup"
-                ],
-                "summary": "Verify phone signup OTP",
-                "parameters": [
-                    {
-                        "description": "Phone OTP verification request",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UserSignupVerification"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Phone verified successfully",
-                        "schema": {
-                            "$ref": "#/definitions/models.UserSignupResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid signup ID or wrong OTP",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Server error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/auth/signup/phone/request": {
             "post": {
                 "description": "Validates phone and user pool, generates an OTP, stores it in Redis, and sends it to the user's phone.",
@@ -944,6 +922,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/signup/phone/verify": {
+            "post": {
+                "description": "Verifies the phone OTP and marks the phone as verified in the signup session.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signup"
+                ],
+                "summary": "Verify phone signup OTP",
+                "parameters": [
+                    {
+                        "description": "Phone OTP verification request",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UserSignupVerification"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Phone verified successfully",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserSignupResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid signup ID or wrong OTP",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/rbac/audit-logs": {
             "get": {
                 "description": "Returns audit logs for a given user pool. Can filter by actor_id, action, and target_id.",
@@ -954,10 +978,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "rbac"
+                    "Rbac"
                 ],
                 "summary": "Get audit logs",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner API Key",
+                        "name": "X-API-KEY",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "User pool ID",
@@ -1019,7 +1050,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "rbac"
+                    "Rbac"
                 ],
                 "summary": "Create a new role in a user pool",
                 "parameters": [
@@ -1028,6 +1059,13 @@ const docTemplate = `{
                         "description": "Owner API Key",
                         "name": "X-API-KEY",
                         "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User pool ID",
+                        "name": "pool_id",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -1069,134 +1107,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/rbac/pools/{pool_id}/users/{user_id}/roles": {
-            "post": {
-                "description": "Assigns a specific role to a user in the given user pool.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rbac"
-                ],
-                "summary": "Assign a role to a user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Owner API Key",
-                        "name": "X-API-KEY",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "User pool ID",
-                        "name": "pool_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "User ID to assign role to",
-                        "name": "user_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Role assigned successfully",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Missing userID or roleID",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized (missing/invalid API key)",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Server/database error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Removes a role assigned to a specific user in the given user pool.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rbac"
-                ],
-                "summary": "Revoke a role from a user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Owner API Key",
-                        "name": "X-API-KEY",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "User pool ID",
-                        "name": "pool_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "user_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Role revoked successfully",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Missing userID or roleID",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized (missing/invalid API key)",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Server/database error",
-                        "schema": {
-                            "$ref": "#/definitions/models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/rbac/roles": {
             "get": {
                 "description": "Returns all roles in a given user pool. Optionally, filter by user_id.",
@@ -1207,10 +1117,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "rbac"
+                    "Rbac"
                 ],
                 "summary": "Retrieve roles for a user pool",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner API Key",
+                        "name": "X-API-KEY",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "User pool ID",
@@ -1266,7 +1183,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "rbac"
+                    "Rbac"
                 ],
                 "summary": "Update role permissions",
                 "parameters": [
@@ -1333,7 +1250,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "rbac"
+                    "Rbac"
                 ],
                 "summary": "Delete a role",
                 "parameters": [
@@ -1381,8 +1298,141 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/rbac/users/{user_id}/role/{role_id}": {
+            "post": {
+                "description": "Assigns a specific role to a user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rbac"
+                ],
+                "summary": "Assign a role to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner API Key",
+                        "name": "X-API-KEY",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID to assign role to",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role assigned successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Missing userID or roleID",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (missing/invalid API key)",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server/database error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Removes a role assigned to a specific user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rbac"
+                ],
+                "summary": "Revoke a role from a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner API Key",
+                        "name": "X-API-KEY",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role revoked successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Missing userID or roleID",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (missing/invalid API key)",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server/database error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/credential/request": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Generates and sends an OTP for resetting a user credential (email or phone).",
                 "consumes": [
                     "application/json"
@@ -1391,7 +1441,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "user-management"
+                    "User-management"
                 ],
                 "summary": "Request OTP for credential reset",
                 "parameters": [
@@ -1435,6 +1485,11 @@ const docTemplate = `{
         },
         "/api/v1/users/credential/verify": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Verifies OTP and updates the requested credential (phone/email) for the logged-in user.",
                 "consumes": [
                     "application/json"
@@ -1443,7 +1498,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "user-management"
+                    "User-management"
                 ],
                 "summary": "Verify OTP for credential reset",
                 "parameters": [
@@ -1496,6 +1551,11 @@ const docTemplate = `{
         },
         "/api/v1/users/password/reset": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Allows a logged-in user to reset their password by verifying the old password and setting a new one.",
                 "consumes": [
                     "application/json"
@@ -1504,7 +1564,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "user-management"
+                    "User-management"
                 ],
                 "summary": "Reset user password",
                 "parameters": [
@@ -1522,10 +1582,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Password Reset Successful",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
@@ -1874,8 +1931,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "permissions": {
-                    "type": "object",
-                    "additionalProperties": {}
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1953,6 +2012,14 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SuccessResponse": {
+            "type": "object",
+            "properties": {
                 "message": {
                     "type": "string"
                 }
@@ -2084,6 +2151,14 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "JWT access token. Format: Bearer {token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
@@ -2091,7 +2166,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:3000",
-	BasePath:         "/api/v1",
+	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "AuthX API",
 	Description:      "Authentication and credential management APIs.",

@@ -8,24 +8,26 @@ import (
 )
 
 type Config struct {
-	Port      string
-	DbUrl     string
-	JwtSecret string
-	RedisAddr string
-	RedisDb   string
-	Retries   string
+	Port           string
+	DbUrl          string
+	RedisAddr      string
+	RedisDb        string
+	Retries        string
+	PrivateKeyPath string
+	PublicKeyPath  string
 }
 
 func LoadConfig() *Config {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:      getEnv("PORT"),
-		DbUrl:     getEnv("DB_URL"),
-		JwtSecret: getEnv("JWT_SECRET"),
-		RedisAddr: getEnv("REDIS_ADDR"),
-		RedisDb:   getEnv("REDIS_DB"),
-		Retries:   getEnv("RETRIES"),
+		Port:           getEnv("PORT"),
+		DbUrl:          getEnv("DB_URL"),
+		RedisAddr:      getEnv("REDIS_ADDR"),
+		RedisDb:        getEnv("REDIS_DB"),
+		Retries:        getEnv("RETRIES"),
+		PrivateKeyPath: getEnv("PRIVATE_KEY_PATH"),
+		PublicKeyPath:  getEnv("PUBLIC_KEY_PATH"),
 	}
 	return cfg
 }

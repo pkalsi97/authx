@@ -1,15 +1,17 @@
 package utils
 
 import (
+	"crypto/rsa"
 	"fmt"
+	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 )
-
-var jwtSecret []byte
 
 type IdClaims struct {
 	UserId   string `json:"sub"`
@@ -20,9 +22,10 @@ type IdClaims struct {
 }
 
 type AccessClaims struct {
-	UserId string   `json:"sub"`
-	Scopes []string `json:"scopes,omitempty"`
-	Roles  []string `json:"roles,omitempty"`
+	UserId   string   `json:"sub"`
+	Userpool string   `json:"userpool"`
+	Scopes   []string `json:"scopes,omitempty"`
+	Roles    []string `json:"roles,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -37,8 +40,33 @@ type RefreshPair struct {
 	AccessToken string
 }
 
-func IntialseTokenGen(key string) {
-	jwtSecret = []byte(key)
+var privateKey *rsa.PrivateKey
+var publicKey *rsa.PublicKey
+var JWKS jwk.Set
+
+func InitialiseTokenGen(privatek *rsa.PrivateKey, publicK *rsa.PublicKey) {
+	privateKey = privatek
+	publicKey = publicK
+}
+
+func InitialiseJWKS() error {
+	set := jwk.NewSet()
+
+	key, err := jwk.FromRaw(publicKey)
+	if err != nil {
+		return err
+	}
+
+	key.Set(jwk.KeyIDKey, "authx-key-1")
+	key.Set(jwk.KeyUsageKey, "sig")
+	key.Set(jwk.AlgorithmKey, "RS256")
+
+	if err := set.AddKey(key); err != nil {
+		return err
+	}
+
+	JWKS = set
+	return nil
 }
 
 func GenerateTokens(userId, email, phone, userpool string, scopes []string, roles []string) (*TokenTuple, error) {
@@ -59,9 +87,10 @@ func GenerateTokens(userId, email, phone, userpool string, scopes []string, role
 	}
 
 	accessClaims := &AccessClaims{
-		UserId: userId,
-		Scopes: scopes,
-		Roles:  roles,
+		UserId:   userId,
+		Userpool: userpool,
+		Scopes:   scopes,
+		Roles:    roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -70,12 +99,12 @@ func GenerateTokens(userId, email, phone, userpool string, scopes []string, role
 		},
 	}
 
-	idToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, idClaims).SignedString(jwtSecret)
+	idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, idClaims).SignedString(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(jwtSecret)
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims).SignedString(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +135,10 @@ func RefreshTokens(userId, email, phone, userpool string, scopes []string, roles
 	}
 
 	accessClaims := &AccessClaims{
-		UserId: userId,
+		UserId:   userId,
+		Userpool: userpool,
+		Scopes:   scopes,
+		Roles:    roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -115,12 +147,12 @@ func RefreshTokens(userId, email, phone, userpool string, scopes []string, roles
 		},
 	}
 
-	idToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, idClaims).SignedString(jwtSecret)
+	idToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, idClaims).SignedString(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(jwtSecret)
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims).SignedString(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -135,10 +167,10 @@ func ExtractUserIDFromIDToken(idToken string) (string, string, error) {
 	claims := &IdClaims{}
 
 	token, err := jwt.ParseWithClaims(idToken, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtSecret, nil
+		return publicKey, nil
 	})
 
 	if err != nil {
@@ -160,14 +192,39 @@ func ExtractUserIDFromIDToken(idToken string) (string, string, error) {
 	return claims.UserId, claims.Userpool, nil
 }
 
+func ExtractInfo(accessToken string) (string, string, error) {
+	claims := &AccessClaims{}
+
+	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return publicKey, nil
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse access token: %w", err)
+	}
+
+	if !token.Valid {
+		return "", "", fmt.Errorf("invalid access token")
+	}
+
+	if claims.UserId == "" || claims.Userpool == "" {
+		return "", "", fmt.Errorf("sub claim (user_id)/ user_pool_id missing in ID token")
+	}
+
+	return claims.UserId, claims.Userpool, nil
+
+}
+
 func ValidateAccessToken(accessToken string, requiredScopes []string, requiredRoles []string) error {
 	claims := &AccessClaims{}
 
 	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtSecret, nil
+		return publicKey, nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to parse access token: %w", err)
@@ -193,5 +250,24 @@ func ValidateAccessToken(accessToken string, requiredScopes []string, requiredRo
 		}
 	}
 
+	if claims.UserId == "" || claims.Userpool == "" {
+		return fmt.Errorf("sub claim (user_id)/ user_pool_id missing in ID token")
+	}
+
 	return nil
+
+}
+
+func ExtractBearerToken(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("missing Authorization header")
+	}
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", fmt.Errorf("invalid Authorization header format, expected 'Bearer <token>'")
+	}
+
+	return parts[1], nil
 }

@@ -14,38 +14,53 @@ import (
 	"github.com/pkalsi97/authx/internal/db"
 	"github.com/pkalsi97/authx/internal/server"
 	"github.com/pkalsi97/authx/internal/utils"
+
+	"net"
+
+	"github.com/pkalsi97/authx/internal/handlers"
+	pb "github.com/pkalsi97/authx/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
-// @title           AuthX API
-// @version         1.0
-// @description     Authentication and credential management APIs.
-// @termsOfService  http://swagger.io/terms/
+// @title AuthX API
+// @version 1.0
+// @description Authentication and credential management APIs.
+// @host localhost:3000
+// @BasePath /
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT access token. Format: Bearer {token}
 
-// @contact.name   API Support
-// @contact.url    http://www.swagger.io/support
-// @contact.email  support@swagger.io
-
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host      localhost:3000
-// @BasePath  /api/v1
-// @schemes   http https
 func main() {
 	cfg := config.LoadConfig()
 	port := cfg.Port
 	dbUrl := cfg.DbUrl
 	redisAddr := cfg.RedisAddr
 	redisDb := cfg.RedisDb
-	jwtSecret := cfg.JwtSecret
+	privateKeyPath := cfg.PrivateKeyPath
+	publicKeyPath := cfg.PublicKeyPath
 
-	utils.IntialseTokenGen(jwtSecret)
+	keys, err := config.LoadKeys(privateKeyPath, publicKeyPath)
+	if err != nil {
+		log.Fatalf("Unable to load keys: %v", err)
+	}
+
+	core.RunMigrations(dbUrl)
+
+	utils.InitialiseTokenGen(keys.Private, keys.Public)
+	if err := utils.InitialiseJWKS(); err != nil {
+		log.Fatalf("Unable to Initialise JWKS: %v", err)
+	}
+
 	utils.InitaliseValidator()
 
 	db.StartDb(dbUrl)
 	db.StartRedis(redisAddr, redisDb)
 
-	mux := server.SetUpRoutes()
+	mux := server.SetUpRoutes(utils.JWKS)
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: core.LoggingMiddleware(mux),
@@ -61,11 +76,29 @@ func main() {
 		}
 	}()
 
+	grpcLis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen on gRPC port: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterAuthServiceServer(grpcServer, &handlers.AuthServer{})
+	reflection.Register(grpcServer)
+	go func() {
+		log.Println("gRPC server running on :50051")
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Fatalf("gRPC server failed: %v", err)
+		}
+	}()
+
 	sig := <-sigChan
 	log.Printf("Shutdown signal received: %s", sig.String())
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	grpcServer.GracefulStop()
+	log.Println("gRPC server exited gracefully")
 
 	if err := server.Shutdown(ctxShutdown); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)

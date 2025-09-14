@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"regexp"
 
@@ -86,15 +85,10 @@ func UserPoolRouter(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  models.ErrorResponse "Database error"
 // @Router       /api/v1/admin/owners/create [post]
 func createAdmin(w http.ResponseWriter, r *http.Request) {
-	var input models.CreateAdminRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.CreateAdminRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -107,9 +101,7 @@ func createAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(result)
+	utils.WriteResponse(w, http.StatusCreated, result)
 }
 
 // CreateAPIKey godoc
@@ -139,9 +131,7 @@ func createAPIKey(w http.ResponseWriter, r *http.Request, adminId string) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusCreated, response)
 }
 
 // DisableAPIKey godoc
@@ -166,9 +156,7 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 		utils.WriteError(w, resp.Status, "Database Error", resp.Message)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // CreateUserPool godoc
@@ -185,20 +173,16 @@ func disableAPIKey(w http.ResponseWriter, r *http.Request, adminId, apiKey strin
 // @Failure      500  {object}  models.ErrorResponse "Database error"
 // @Router       /api/v1/admin/user-pools/create [post]
 func createUserpool(w http.ResponseWriter, r *http.Request) {
-	var input models.CreateUserPoolRequest
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+		return
+	}
+
 	apiKey := r.Header.Get("X-API-KEY")
-	if apiKey == "" {
-		utils.WriteError(w, http.StatusUnauthorized, "Missing API Key", "X-API-KEY is not present in the headers")
-		return
-	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.CreateUserPoolRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -231,10 +215,7 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 		utils.WriteError(w, http.StatusInternalServerError, "Failed to seed default roles", resp.Message)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(result)
+	utils.WriteResponse(w, http.StatusOK, result)
 }
 
 // UpdateUserPool godoc
@@ -253,18 +234,19 @@ func createUserpool(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {object}  models.ErrorResponse "Failed to update user pool"
 // @Router       /api/v1/admin/user-pools/{userpoolId} [patch]
 func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
-	var input models.UpdateUserPoolRequest
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
 		return
 	}
 
 	apiKey := r.Header.Get("X-API-KEY")
+
+	input, err := utils.BindAndValidate[models.UpdateUserPoolRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
+		return
+	}
+
 	var ownerId string
 	query := `SELECT owner_id FROM owners_api_keys WHERE key_hash = $1 AND revoked = false`
 	args := []any{apiKey}
@@ -286,9 +268,7 @@ func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // DeleteUserPool godoc
@@ -305,6 +285,11 @@ func updateUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 // @Failure      500  {object}  models.ErrorResponse "Failed to delete user pool"
 // @Router       /api/v1/admin/user-pools/{userpoolId} [delete]
 func deleteUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
+	if err := utils.CheckHeaders(r, []string{"X-API-KEY"}); err != nil {
+		utils.WriteError(w, http.StatusUnauthorized, "Missing Headers", err.Error())
+		return
+	}
+
 	apiKey := r.Header.Get("X-API-KEY")
 
 	var ownerId string
@@ -331,7 +316,5 @@ func deleteUserpool(w http.ResponseWriter, r *http.Request, userpoolId string) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User pool deleted successfully"})
+	utils.WriteResponse(w, http.StatusOK, map[string]string{"message": "User pool deleted successfully"})
 }

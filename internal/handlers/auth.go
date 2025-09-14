@@ -27,22 +27,11 @@ import (
 // @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/phone/request [post]
 func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.SignupPhoneRequest
 	var user models.UserSignupData
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Request Method", "")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.SignupPhoneRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -93,9 +82,7 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "OTP sent successfully",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // SignupEmailOtpRequestHandler godoc
@@ -111,22 +98,11 @@ func SignupPhoneOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {object}  models.ErrorResponse        "Database or server error"
 // @Router       /api/v1/auth/signup/email/request [post]
 func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.SignupEmailRequest
 	var user *models.UserSignupData
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Request Method", "")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.SignupEmailRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -183,10 +159,7 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Id:      user.ID,
 		Message: "OTP sent successfully",
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // SignupPhoneOtpVerifyHandler godoc
@@ -199,28 +172,17 @@ func SignupEmailOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.UserSignupResponse "Phone verified successfully"
 // @Failure 400 {object} models.ErrorResponse "Invalid signup ID or wrong OTP"
 // @Failure 500 {object} models.ErrorResponse "Server error"
-// @Router /api/v1/auth/signup/otp/phone/verify [post]
+// @Router /api/v1/auth/signup/phone/verify [post]
 func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.UserSignupVerification
 	var user *models.UserSignupData
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Request Method", "")
+	input, err := utils.BindAndValidate[models.UserSignupVerification](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
-		return
-	}
-
-	user, err := db.RedisGet[models.UserSignupData](r.Context(), input.ID)
+	user, err = db.RedisGet[models.UserSignupData](r.Context(), input.ID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Verify OTP", err.Error())
 		return
@@ -257,11 +219,9 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	response := &models.UserSignupResponse{
 		Id:      user.ID,
-		Message: "OTP sent successfully",
+		Message: "OTP Verified successfully",
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // SignupVerifyAndCompleteHandler godoc
@@ -278,26 +238,15 @@ func SignupPhoneOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} models.ErrorResponse "Server error, Redis error, or database failure"
 // @Router /api/v1/auth/signup/complete [post]
 func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.UserSignupVerification
 	var user *models.UserSignupData
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Request Method", "")
+	input, err := utils.BindAndValidate[models.UserSignupVerification](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
-		return
-	}
-
-	user, err := db.RedisGet[models.UserSignupData](r.Context(), input.ID)
+	user, err = db.RedisGet[models.UserSignupData](r.Context(), input.ID)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, "Unable to Verify OTP", err.Error())
 		return
@@ -435,9 +384,7 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: tokens.RefreshToken,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // PasswordLoginHandler godoc
@@ -454,21 +401,10 @@ func SignupVerifyAndCompleteHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/auth/login/password [post]
 func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.PasswordLoginRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Status Used", "")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body!", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.PasswordLoginRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -500,6 +436,31 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	query = `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
+	_, err = db.GetDb().Exec(r.Context(), query, id)
+	if err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+		return
+	}
+
+	hashedToken, err := utils.CreateHash(tokens.RefreshToken)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", err.Error())
+		return
+	}
+
+	var tokenID string
+	query = `INSERT INTO refresh_tokens (user_id, token_hash,expires_at)
+			VALUES($1,$2,$3)
+			RETURNING id`
+	args = []any{id, hashedToken, time.Now().Add(365 * time.Minute)}
+	if err := db.QueryRowAndScan(r.Context(), query, args, &tokenID); err != nil {
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
+		return
+	}
+
 	core.CaptureAudit(r.Context(), input.Userpool, id, id, core.ActionUserLogin, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	response := &models.LoginResponse{
@@ -509,9 +470,7 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: tokens.RefreshToken,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // LoginOtpRequestHandler godoc
@@ -525,23 +484,12 @@ func PasswordLoginHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {object}  models.ErrorResponse     "Invalid request body or method"
 // @Failure      404    {object}  models.ErrorResponse     "User not found"
 // @Failure      500    {object}  models.ErrorResponse     "Server or database error"
-// @Router       /api/v1/auth/login/otp/request [post]
+// @Router       /api/v1/auth/login/request [post]
 func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.OtpLoginRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Incorrect Method", "Use POST")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request Body", err.Error())
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.OtpLoginRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -603,9 +551,7 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "OTP sent successfully",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // LoginOtpVerifyHandler godoc
@@ -619,23 +565,12 @@ func LoginOtpRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      400    {object}  models.ErrorResponse          "Invalid request body, wrong OTP, or validation error"
 // @Failure      404    {object}  models.ErrorResponse          "OTP session not found or expired"
 // @Failure      500    {object}  models.ErrorResponse          "Server, database, or token generation error"
-// @Router       /api/v1/auth/login/otp/verify [post]
+// @Router       /api/v1/auth/login/verify [post]
 func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.OtpLoginVerifyRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Method", "Use Post Method")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request body", "Invalid Request Body")
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.OtpLoginVerifyRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -678,10 +613,11 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `DELETE FROM refresh_tokens WHERE user_id=$1`
+	query := `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
 	_, err = db.GetDb().Exec(r.Context(), query, cache.UserId)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
 
@@ -715,9 +651,7 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: tokens.RefreshToken,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // SessionRefreshHandler godoc
@@ -734,27 +668,16 @@ func LoginOtpVerifyHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {object}  models.ErrorResponse         "Server or database error"
 // @Router       /api/v1/auth/session/refresh [post]
 func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
-	var token models.RefreshSessionRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Method", "Use Post Method")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&token); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request body", "Invalid Request Body")
-		return
-	}
-
-	if err := utils.ValidateInput(token); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	token, err := utils.BindAndValidate[models.RefreshSessionRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
 	userId, userpool, err := utils.ExtractUserIDFromIDToken(token.Idtoken)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Login Failed", "")
+		utils.WriteError(w, http.StatusInternalServerError, "Session Refresh Failed", err.Error())
 		return
 	}
 
@@ -768,7 +691,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !utils.CompareHash(tokenHash, token.Refreshtoken) {
-		utils.WriteError(w, http.StatusUnauthorized, "Incorrect Password", "Plase enter the correct password")
+		utils.WriteError(w, http.StatusUnauthorized, "Session Refresh Failed", "Please Provide Correct Refresh Token")
 		return
 	}
 
@@ -799,9 +722,7 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 		AccessToken: newTokens.AccessToken,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // LogoutHandler godoc
@@ -817,21 +738,10 @@ func SessionRefreshHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {object}  models.ErrorResponse  "Database error while revoking tokens"
 // @Router       /api/v1/auth/logout [post]
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.LogoutRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Method", "Use POST")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request body", "Invalid Request Body")
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.LogoutRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -841,12 +751,14 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `DELETE FROM refresh_tokens WHERE user_id=$1`
+	query := `UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false`
 	_, err = db.GetDb().Exec(r.Context(), query, userId)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, "Failed to delete old tokens", err.Error())
+		resp := db.MapDbError(err)
+		utils.WriteError(w, http.StatusInternalServerError, "Unable to Complete Login", resp.Message)
 		return
 	}
+
 	core.CaptureAudit(r.Context(), userpool, userId, userId, core.ActionUserLogout, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
 
 	w.Header().Set("Content-Type", "application/json")
@@ -854,7 +766,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{
 		"message": "Logout Succesful!",
 	}
-	json.NewEncoder(w).Encode(resp)
+	utils.WriteResponse(w, http.StatusOK, resp)
 }
 
 // PasswordResetRequestHandler godoc
@@ -870,21 +782,10 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} models.ErrorResponse "Server or database error"
 // @Router /api/v1/auth/password/request [post]
 func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.PasswordResetRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Method", "Use POST")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request body", "Invalid Request Body")
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.PasswordResetRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -930,9 +831,8 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Id:      cacheid,
 		Message: "OTP SENT",
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+
+	utils.WriteResponse(w, http.StatusOK, response)
 }
 
 // PasswordResetCompleteHandler godoc
@@ -948,21 +848,10 @@ func PasswordResetRequestHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} models.ErrorResponse "Server or database error"
 // @Router /api/v1/auth/password/reset [post]
 func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
-	var input models.PasswordResetVerifyRequest
 
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		utils.WriteError(w, http.StatusMethodNotAllowed, "Invalid Method", "Use POST")
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Invalid Request body", "Invalid Request Body")
-		return
-	}
-
-	if err := utils.ValidateInput(input); err != nil {
-		utils.WriteError(w, http.StatusBadRequest, "Validation Error", err.Error())
+	input, err := utils.BindAndValidate[models.PasswordResetVerifyRequest](r, http.MethodPost)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, "Invalid Request", err.Error())
 		return
 	}
 
@@ -1016,11 +905,52 @@ func PasswordResetCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	core.CaptureAudit(r.Context(), cache.Userpool, cache.UserID, cache.UserID, core.ActionPasswordChanged, (*core.AuditMetadata)(core.ExtractRequestMetadata(r)))
+	utils.WriteResponse(w, http.StatusOK, map[string]string{"message": "Password Reset"})
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	resp := map[string]string{
-		"message": "Password Reset",
+// ValidateTokenHandler godoc
+// @Summary Validate access token
+// @Description Introspects an access token to check if it is active. Returns {"active": true} with user info if valid, {"active": false} otherwise.
+// @Tags Authentication
+// @Accept x-www-form-urlencoded
+// @Produce json
+// @Param token formData string true "Access token to validate"
+// @Success 200 {object} map[string]interface{} "Token introspection result containing active status, user id, userpool, scopes, and roles"
+// @Router /api/v1/auth/introspect [post]
+func ValidateToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	accessToken := r.FormValue("token")
+	if accessToken == "" {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	userId, userpool, err := utils.ExtractInfo(accessToken)
+	if err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	permissions, roles, err := db.GetUserRolesAndPermissions(r.Context(), userId)
+	if err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+
+	if err := utils.ValidateAccessToken(accessToken, permissions, roles); err != nil {
+		utils.WriteResponse(w, http.StatusOK, map[string]any{"active": false})
+		return
+	}
+	response := map[string]any{
+		"active":   true,
+		"sub":      userId,
+		"userpool": userpool,
+		"scopes":   permissions,
+		"roles":    roles,
+	}
+	utils.WriteResponse(w, http.StatusOK, response)
 }
