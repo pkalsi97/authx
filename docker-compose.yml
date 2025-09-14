@@ -1,0 +1,38 @@
+services:
+  authx:
+    build: .
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+      - .env.docker
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./keys:/app/keys
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M
+    command: ["make", "all"]
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
