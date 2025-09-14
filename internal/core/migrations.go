@@ -17,7 +17,12 @@ func RunMigrations(databaseURL string) {
 		log.Fatalf("Failed to initialize migrations: %v", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	err = m.Up()
+	if err != nil {
+		if err == migrate.ErrNoChange {
+			log.Println("Database schema is already up-to-date")
+			return
+		}
 		log.Fatalf("Failed to apply migrations: %v", err)
 	}
 
