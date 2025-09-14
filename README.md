@@ -64,7 +64,7 @@ Run these commands to get your environment ready:
 
 ```sh
 # Copy example environment files
-cp .env.example .env                # For local development
+cp .env.docker.example .env                # For local development
 cp .env.docker.example .env.docker  # For Docker/production
 
 # Initialize Go modules
